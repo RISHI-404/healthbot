@@ -23,12 +23,7 @@ services:
     env: node
     buildCommand: cd frontend && npm install && npm run build
     startCommand: cd frontend && npm run preview -- --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: VITE_API_URL
-        fromService:
-          type: web
-          name: healthcare-chatbot-backend
-          property: url
+
 
 databases:
   - name: healthcare-db
