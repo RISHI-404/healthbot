@@ -3,6 +3,7 @@ services:
   - type: web
     name: healthcare-chatbot-backend
     env: python
+    plan: free
     buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -21,6 +22,7 @@ services:
   - type: web
     name: healthcare-chatbot-frontend
     env: node
+    plan: free
     buildCommand: cd frontend && npm install && npm run build
     startCommand: cd frontend && npm run preview -- --host 0.0.0.0 --port $PORT
 
