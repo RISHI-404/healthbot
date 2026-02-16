@@ -1,0 +1,175 @@
+{
+  "intents": [
+    {
+      "tag": "greeting",
+      "patterns": [
+        "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+        "hi there", "hello there", "hey there", "greetings", "howdy",
+        "what's up", "how are you", "nice to meet you"
+      ],
+      "responses": [
+        "Hello! I'm your healthcare assistant. How can I help you today?",
+        "Hi there! I'm here to help with your health questions. What would you like to know?",
+        "Welcome! I can help with symptoms, appointments, medications, and general health information. How can I assist you?"
+      ]
+    },
+    {
+      "tag": "farewell",
+      "patterns": [
+        "bye", "goodbye", "see you", "take care", "good night",
+        "later", "see you later", "bye bye", "have a nice day",
+        "thanks goodbye", "thanks bye", "that's all"
+      ],
+      "responses": [
+        "Goodbye! Take care and stay healthy! 🌟",
+        "See you later! Remember, I'm here whenever you need health guidance.",
+        "Bye! Don't hesitate to come back if you have any health questions."
+      ]
+    },
+    {
+      "tag": "thanks",
+      "patterns": [
+        "thanks", "thank you", "thank you so much", "thanks a lot",
+        "appreciate it", "thanks for your help", "helpful",
+        "great help", "you're helpful"
+      ],
+      "responses": [
+        "You're welcome! Is there anything else I can help with?",
+        "Happy to help! Let me know if you have other questions.",
+        "Glad I could assist! Stay healthy! 😊"
+      ]
+    },
+    {
+      "tag": "symptom_query",
+      "patterns": [
+        "I have a headache", "my head hurts", "I feel dizzy",
+        "I have a fever", "I'm feeling sick", "I have a cough",
+        "my stomach hurts", "I have body aches", "I feel nauseous",
+        "I have a sore throat", "I'm not feeling well", "I feel tired",
+        "I have pain in my chest", "my back hurts", "I have joint pain",
+        "I feel weak", "I have a runny nose", "I'm bleeding",
+        "I have a rash", "my skin itches", "I can't sleep",
+        "I feel anxious", "I'm feeling depressed",
+        "what are the symptoms of", "what could be wrong with me",
+        "why do I feel", "I have been experiencing"
+      ],
+      "responses": [
+        "I understand you're experiencing some symptoms. Let me analyze what you've described. Based on your symptoms, I recommend consulting a healthcare professional for a proper diagnosis. Would you like to try our Symptom Checker for more detailed guidance?",
+        "Thank you for sharing your symptoms. While I can provide general guidance, it's important to see a doctor for accurate diagnosis. Can you tell me more about when these symptoms started?",
+        "I hear you. Health concerns can be worrying. Let me help you understand your symptoms better. Have these symptoms been persistent or do they come and go?"
+      ]
+    },
+    {
+      "tag": "appointment_request",
+      "patterns": [
+        "I need an appointment", "book an appointment", "schedule a visit",
+        "I want to see a doctor", "can I make an appointment",
+        "I need to schedule", "appointment booking", "doctor visit",
+        "when can I see a doctor", "schedule checkup",
+        "I need a checkup", "book a consultation"
+      ],
+      "responses": [
+        "I can help you manage your appointments! You can create, view, and manage your appointments from your Dashboard. Would you like to go there now?",
+        "Sure! You can schedule an appointment through the Appointments section in your Dashboard. Would you like me to guide you there?",
+        "Of course! Head to your Dashboard to book an appointment. You can set the date, time, doctor name, and location."
+      ]
+    },
+    {
+      "tag": "medication_info",
+      "patterns": [
+        "I need to take medicine", "medication reminder", "my medications",
+        "what medicine should I take", "drug information",
+        "set a medication reminder", "remind me to take",
+        "medication schedule", "pill reminder", "prescription",
+        "what does this medicine do", "side effects of"
+      ],
+      "responses": [
+        "I can help you manage your medications! You can add and track medication reminders from your Dashboard. Would you like to set one up?",
+        "Medication management is important! Use the Medications section in your Dashboard to set reminders. I recommend always following your doctor's prescribed dosage.",
+        "For medication information, I suggest consulting your pharmacist or doctor. Meanwhile, you can set up medication reminders in your Dashboard to stay on track."
+      ]
+    },
+    {
+      "tag": "general_health",
+      "patterns": [
+        "health tips", "how to stay healthy", "wellness advice",
+        "nutrition tips", "exercise advice", "diet recommendations",
+        "how to improve health", "healthy lifestyle",
+        "preventive care", "health recommendations",
+        "how much water should I drink", "how much sleep do I need"
+      ],
+      "responses": [
+        "Great question about health! Here are some general tips:\n\n• Stay hydrated (8 glasses of water daily)\n• Get 7-9 hours of sleep\n• Exercise regularly (150 min/week)\n• Eat a balanced diet rich in fruits and vegetables\n• Manage stress through relaxation techniques\n\nWould you like more specific advice?",
+        "Maintaining good health involves several key habits:\n\n• Regular physical activity\n• Balanced nutrition\n• Adequate sleep\n• Stress management\n• Regular health checkups\n\nIs there a specific area you'd like to know more about?",
+        "Health is holistic! Focus on nutrition, exercise, sleep, and mental wellbeing. Regular checkups with your doctor are also important. What specific health topic interests you?"
+      ]
+    },
+    {
+      "tag": "mental_health",
+      "patterns": [
+        "I'm feeling stressed", "I have anxiety", "I feel depressed",
+        "mental health help", "I'm not doing well mentally",
+        "I can't cope", "feeling overwhelmed", "I need emotional support",
+        "therapy options", "counseling", "I feel lonely",
+        "panic attack", "mood swings", "can't concentrate"
+      ],
+      "responses": [
+        "I appreciate you sharing this with me. Mental health is just as important as physical health. Here are some suggestions:\n\n• Talk to a mental health professional\n• Practice deep breathing or meditation\n• Maintain social connections\n• Exercise regularly\n• Establish a routine\n\n⚠️ If you're in crisis, please contact the 988 Suicide & Crisis Lifeline by calling or texting 988.",
+        "Your mental wellbeing matters greatly. Please consider reaching out to a mental health professional who can provide personalized support. In the meantime, try mindfulness exercises, regular physical activity, and connecting with loved ones.\n\n⚠️ If you need immediate help, please call 988 (Suicide & Crisis Lifeline).",
+        "Thank you for being open about how you're feeling. Remember, seeking help is a sign of strength. I'd recommend speaking with a counselor or therapist. Would you like me to help you schedule an appointment?"
+      ]
+    },
+    {
+      "tag": "covid_info",
+      "patterns": [
+        "covid symptoms", "coronavirus", "covid test",
+        "covid vaccine", "do I have covid", "covid prevention",
+        "covid treatment", "quarantine", "isolation",
+        "covid booster", "long covid"
+      ],
+      "responses": [
+        "COVID-19 common symptoms include fever, cough, fatigue, and loss of taste/smell. If you suspect COVID-19:\n\n• Get tested at a local testing center\n• Isolate if positive\n• Monitor symptoms\n• Seek medical attention if symptoms worsen\n• Stay up to date with vaccinations\n\nAlways consult your healthcare provider for personalized advice.",
+        "For COVID-19 concerns, I recommend getting tested and consulting your doctor. Key prevention measures include vaccination, hand hygiene, and wearing masks in high-risk settings. Would you like more specific information?"
+      ]
+    },
+    {
+      "tag": "first_aid",
+      "patterns": [
+        "first aid for burns", "how to treat a cut", "what to do for a sprain",
+        "nosebleed treatment", "how to stop bleeding",
+        "first aid basics", "treat a bruise", "insect bite treatment",
+        "what to do for a fall", "minor injury help"
+      ],
+      "responses": [
+        "For basic first aid:\n\n🩹 **Cuts**: Clean with water, apply antiseptic, use a bandage\n🔥 **Burns**: Cool with running water for 10+ min, don't use ice\n💪 **Sprains**: Rest, Ice, Compression, Elevation (RICE)\n👃 **Nosebleeds**: Lean forward, pinch nostrils for 10 min\n\n⚠️ For serious injuries, always call emergency services. This is general guidance only.",
+        "Here's basic first aid guidance. Remember, for any serious injury, always seek professional medical help immediately. Would you like specific first aid instructions?"
+      ]
+    },
+    {
+      "tag": "symptom_checker",
+      "patterns": [
+        "check my symptoms", "symptom checker", "analyze my symptoms",
+        "what disease do I have", "diagnose me", "what's wrong with me",
+        "run symptom check", "symptom analysis", "health assessment",
+        "start symptom checker", "help me check symptoms"
+      ],
+      "responses": [
+        "I'll guide you through our Symptom Checker! This tool will ask you a series of questions to help identify potential conditions. Please note that this is for informational purposes only and not a medical diagnosis. Would you like to start?",
+        "Let's use the Symptom Checker! I'll ask you step-by-step questions about your symptoms. Remember, this provides general guidance — always consult a doctor for proper diagnosis. Ready to begin?"
+      ]
+    },
+    {
+      "tag": "about_bot",
+      "patterns": [
+        "what can you do", "who are you", "what are you",
+        "how can you help", "your capabilities", "what do you know",
+        "tell me about yourself", "what is this bot",
+        "how does this work", "chatbot features"
+      ],
+      "responses": [
+        "I'm your AI Healthcare Assistant! Here's what I can help with:\n\n🏥 **Symptom Analysis** — Describe your symptoms for guidance\n✅ **Symptom Checker** — Step-by-step health assessment\n📅 **Appointments** — Manage your medical appointments\n💊 **Medications** — Track medication reminders\n🧠 **Health Info** — General health and wellness tips\n\n⚠️ *I'm not a doctor. Always consult healthcare professionals for medical decisions.*",
+        "I'm an AI-powered health assistant designed to help with symptom guidance, appointment scheduling, medication tracking, and general health information. How can I assist you today?"
+      ]
+    }
+  ]
+}

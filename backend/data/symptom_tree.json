@@ -1,0 +1,867 @@
+{
+    "nodes": {
+        "root": {
+            "question": "What is the primary area of concern?",
+            "category": "general",
+            "options": [
+                {
+                    "text": "Head / Neurological",
+                    "next": "head_main",
+                    "scores": {}
+                },
+                {
+                    "text": "Chest / Respiratory",
+                    "next": "chest_main",
+                    "scores": {}
+                },
+                {
+                    "text": "Abdomen / Digestive",
+                    "next": "abdomen_main",
+                    "scores": {}
+                },
+                {
+                    "text": "Musculoskeletal (Joints / Muscles)",
+                    "next": "musculo_main",
+                    "scores": {}
+                },
+                {
+                    "text": "Skin",
+                    "next": "skin_main",
+                    "scores": {}
+                },
+                {
+                    "text": "General / Whole Body",
+                    "next": "general_main",
+                    "scores": {}
+                }
+            ]
+        },
+        "head_main": {
+            "question": "What best describes your head-related symptom?",
+            "category": "head",
+            "options": [
+                {
+                    "text": "Persistent headache",
+                    "next": "headache_duration",
+                    "scores": {
+                        "migraine": 2,
+                        "tension_headache": 2
+                    }
+                },
+                {
+                    "text": "Dizziness or lightheadedness",
+                    "next": "dizziness_detail",
+                    "scores": {
+                        "vertigo": 2,
+                        "anemia": 1
+                    }
+                },
+                {
+                    "text": "Blurred or impaired vision",
+                    "next": "vision_detail",
+                    "scores": {
+                        "migraine": 1,
+                        "eye_strain": 2
+                    }
+                },
+                {
+                    "text": "Sore throat",
+                    "next": "throat_detail",
+                    "scores": {
+                        "common_cold": 2,
+                        "strep_throat": 2
+                    }
+                }
+            ]
+        },
+        "headache_duration": {
+            "question": "How long have you had the headache?",
+            "category": "head",
+            "options": [
+                {
+                    "text": "Less than 24 hours",
+                    "next": "headache_severity",
+                    "scores": {
+                        "tension_headache": 2
+                    }
+                },
+                {
+                    "text": "1-3 days",
+                    "next": "headache_severity",
+                    "scores": {
+                        "migraine": 2,
+                        "tension_headache": 1
+                    }
+                },
+                {
+                    "text": "More than 3 days",
+                    "next": "headache_severity",
+                    "scores": {
+                        "migraine": 3,
+                        "chronic_headache": 2
+                    }
+                },
+                {
+                    "text": "Recurring over weeks/months",
+                    "next": "headache_severity",
+                    "scores": {
+                        "chronic_headache": 3,
+                        "migraine": 2
+                    }
+                }
+            ]
+        },
+        "headache_severity": {
+            "question": "How would you rate the pain severity?",
+            "category": "head",
+            "options": [
+                {
+                    "text": "Mild — annoying but manageable",
+                    "next": "headache_additional",
+                    "scores": {
+                        "tension_headache": 2
+                    }
+                },
+                {
+                    "text": "Moderate — affects daily activities",
+                    "next": "headache_additional",
+                    "scores": {
+                        "migraine": 2,
+                        "tension_headache": 1
+                    }
+                },
+                {
+                    "text": "Severe — debilitating",
+                    "next": "headache_additional",
+                    "scores": {
+                        "migraine": 3
+                    }
+                },
+                {
+                    "text": "Worst headache of my life",
+                    "next": "headache_additional",
+                    "scores": {
+                        "migraine": 2,
+                        "serious_condition": 4
+                    }
+                }
+            ]
+        },
+        "headache_additional": {
+            "question": "Do you experience any of these with the headache?",
+            "category": "head",
+            "options": [
+                {
+                    "text": "Nausea or vomiting",
+                    "next": null,
+                    "scores": {
+                        "migraine": 3
+                    }
+                },
+                {
+                    "text": "Sensitivity to light/sound",
+                    "next": null,
+                    "scores": {
+                        "migraine": 3
+                    }
+                },
+                {
+                    "text": "Neck stiffness",
+                    "next": null,
+                    "scores": {
+                        "tension_headache": 2,
+                        "serious_condition": 2
+                    }
+                },
+                {
+                    "text": "None of the above",
+                    "next": null,
+                    "scores": {
+                        "tension_headache": 2
+                    }
+                }
+            ]
+        },
+        "dizziness_detail": {
+            "question": "When does the dizziness occur?",
+            "category": "head",
+            "options": [
+                {
+                    "text": "When standing up quickly",
+                    "next": null,
+                    "scores": {
+                        "orthostatic_hypotension": 3,
+                        "anemia": 2
+                    }
+                },
+                {
+                    "text": "Constantly, with room spinning",
+                    "next": null,
+                    "scores": {
+                        "vertigo": 4
+                    }
+                },
+                {
+                    "text": "With physical exertion",
+                    "next": null,
+                    "scores": {
+                        "anemia": 3,
+                        "dehydration": 2
+                    }
+                },
+                {
+                    "text": "Randomly throughout the day",
+                    "next": null,
+                    "scores": {
+                        "vertigo": 2,
+                        "anxiety": 2
+                    }
+                }
+            ]
+        },
+        "vision_detail": {
+            "question": "Describe your vision issue:",
+            "category": "head",
+            "options": [
+                {
+                    "text": "Blurry at close range",
+                    "next": null,
+                    "scores": {
+                        "eye_strain": 3
+                    }
+                },
+                {
+                    "text": "Flashing lights or auras",
+                    "next": null,
+                    "scores": {
+                        "migraine": 4
+                    }
+                },
+                {
+                    "text": "Double vision",
+                    "next": null,
+                    "scores": {
+                        "serious_condition": 3
+                    }
+                },
+                {
+                    "text": "Gradual worsening over time",
+                    "next": null,
+                    "scores": {
+                        "eye_strain": 2,
+                        "vision_decline": 3
+                    }
+                }
+            ]
+        },
+        "throat_detail": {
+            "question": "Describe your sore throat symptoms:",
+            "category": "head",
+            "options": [
+                {
+                    "text": "Mild scratchy feeling with runny nose",
+                    "next": null,
+                    "scores": {
+                        "common_cold": 4
+                    }
+                },
+                {
+                    "text": "Severe pain with white spots on tonsils",
+                    "next": null,
+                    "scores": {
+                        "strep_throat": 4
+                    }
+                },
+                {
+                    "text": "Pain with fever above 101°F",
+                    "next": null,
+                    "scores": {
+                        "strep_throat": 3,
+                        "flu": 2
+                    }
+                },
+                {
+                    "text": "Mild with cough",
+                    "next": null,
+                    "scores": {
+                        "common_cold": 3,
+                        "bronchitis": 1
+                    }
+                }
+            ]
+        },
+        "chest_main": {
+            "question": "What chest/respiratory symptom are you experiencing?",
+            "category": "chest",
+            "options": [
+                {
+                    "text": "Persistent cough",
+                    "next": "cough_detail",
+                    "scores": {
+                        "bronchitis": 2,
+                        "common_cold": 1
+                    }
+                },
+                {
+                    "text": "Shortness of breath",
+                    "next": "breath_detail",
+                    "scores": {
+                        "asthma": 2,
+                        "anxiety": 1
+                    }
+                },
+                {
+                    "text": "Chest tightness or discomfort",
+                    "next": "chest_detail",
+                    "scores": {
+                        "asthma": 1,
+                        "anxiety": 2
+                    }
+                },
+                {
+                    "text": "Wheezing",
+                    "next": null,
+                    "scores": {
+                        "asthma": 4,
+                        "bronchitis": 2
+                    }
+                }
+            ]
+        },
+        "cough_detail": {
+            "question": "Describe your cough:",
+            "category": "chest",
+            "options": [
+                {
+                    "text": "Dry, no mucus",
+                    "next": null,
+                    "scores": {
+                        "allergy": 3,
+                        "asthma": 2
+                    }
+                },
+                {
+                    "text": "Wet/productive with clear mucus",
+                    "next": null,
+                    "scores": {
+                        "common_cold": 3,
+                        "bronchitis": 2
+                    }
+                },
+                {
+                    "text": "Wet with yellow/green mucus",
+                    "next": null,
+                    "scores": {
+                        "bronchitis": 4,
+                        "sinusitis": 2
+                    }
+                },
+                {
+                    "text": "Cough lasting more than 3 weeks",
+                    "next": null,
+                    "scores": {
+                        "bronchitis": 3,
+                        "chronic_cough": 3
+                    }
+                }
+            ]
+        },
+        "breath_detail": {
+            "question": "When do you experience shortness of breath?",
+            "category": "chest",
+            "options": [
+                {
+                    "text": "During exercise only",
+                    "next": null,
+                    "scores": {
+                        "exercise_induced_asthma": 3,
+                        "deconditioning": 2
+                    }
+                },
+                {
+                    "text": "At rest",
+                    "next": null,
+                    "scores": {
+                        "asthma": 3,
+                        "anxiety": 3
+                    }
+                },
+                {
+                    "text": "When lying down",
+                    "next": null,
+                    "scores": {
+                        "serious_condition": 3
+                    }
+                },
+                {
+                    "text": "With wheezing sounds",
+                    "next": null,
+                    "scores": {
+                        "asthma": 4
+                    }
+                }
+            ]
+        },
+        "chest_detail": {
+            "question": "Describe the chest discomfort:",
+            "category": "chest",
+            "options": [
+                {
+                    "text": "Tightness that comes and goes",
+                    "next": null,
+                    "scores": {
+                        "anxiety": 3,
+                        "asthma": 2
+                    }
+                },
+                {
+                    "text": "Sharp pain with deep breathing",
+                    "next": null,
+                    "scores": {
+                        "pleurisy": 3,
+                        "muscle_strain": 2
+                    }
+                },
+                {
+                    "text": "Burning sensation",
+                    "next": null,
+                    "scores": {
+                        "acid_reflux": 4
+                    }
+                },
+                {
+                    "text": "Pressure feeling",
+                    "next": null,
+                    "scores": {
+                        "anxiety": 3,
+                        "serious_condition": 2
+                    }
+                }
+            ]
+        },
+        "abdomen_main": {
+            "question": "What abdominal symptom are you experiencing?",
+            "category": "abdomen",
+            "options": [
+                {
+                    "text": "Stomach pain or cramps",
+                    "next": "stomach_detail",
+                    "scores": {
+                        "gastritis": 2
+                    }
+                },
+                {
+                    "text": "Nausea or vomiting",
+                    "next": "nausea_detail",
+                    "scores": {
+                        "gastroenteritis": 2
+                    }
+                },
+                {
+                    "text": "Diarrhea or constipation",
+                    "next": "bowel_detail",
+                    "scores": {
+                        "ibs": 2
+                    }
+                },
+                {
+                    "text": "Bloating or gas",
+                    "next": null,
+                    "scores": {
+                        "ibs": 3,
+                        "food_intolerance": 2
+                    }
+                }
+            ]
+        },
+        "stomach_detail": {
+            "question": "Where is the pain located?",
+            "category": "abdomen",
+            "options": [
+                {
+                    "text": "Upper abdomen / around stomach",
+                    "next": null,
+                    "scores": {
+                        "gastritis": 3,
+                        "acid_reflux": 2
+                    }
+                },
+                {
+                    "text": "Lower right abdomen",
+                    "next": null,
+                    "scores": {
+                        "appendicitis": 4
+                    }
+                },
+                {
+                    "text": "Lower left abdomen",
+                    "next": null,
+                    "scores": {
+                        "diverticulitis": 3,
+                        "ibs": 2
+                    }
+                },
+                {
+                    "text": "All over / general",
+                    "next": null,
+                    "scores": {
+                        "gastroenteritis": 3,
+                        "ibs": 2
+                    }
+                }
+            ]
+        },
+        "nausea_detail": {
+            "question": "How long have you been experiencing nausea?",
+            "category": "abdomen",
+            "options": [
+                {
+                    "text": "Started today",
+                    "next": null,
+                    "scores": {
+                        "food_poisoning": 3,
+                        "gastroenteritis": 2
+                    }
+                },
+                {
+                    "text": "2-3 days",
+                    "next": null,
+                    "scores": {
+                        "gastroenteritis": 3
+                    }
+                },
+                {
+                    "text": "More than a week",
+                    "next": null,
+                    "scores": {
+                        "gastritis": 3,
+                        "serious_condition": 1
+                    }
+                },
+                {
+                    "text": "Comes and goes over weeks",
+                    "next": null,
+                    "scores": {
+                        "ibs": 2,
+                        "gastritis": 2
+                    }
+                }
+            ]
+        },
+        "bowel_detail": {
+            "question": "Describe your bowel issue:",
+            "category": "abdomen",
+            "options": [
+                {
+                    "text": "Frequent watery diarrhea",
+                    "next": null,
+                    "scores": {
+                        "gastroenteritis": 4,
+                        "food_poisoning": 2
+                    }
+                },
+                {
+                    "text": "Alternating diarrhea and constipation",
+                    "next": null,
+                    "scores": {
+                        "ibs": 4
+                    }
+                },
+                {
+                    "text": "Persistent constipation",
+                    "next": null,
+                    "scores": {
+                        "constipation": 3,
+                        "ibs": 1
+                    }
+                },
+                {
+                    "text": "Blood in stool",
+                    "next": null,
+                    "scores": {
+                        "serious_condition": 4
+                    }
+                }
+            ]
+        },
+        "musculo_main": {
+            "question": "What musculoskeletal symptom are you experiencing?",
+            "category": "musculoskeletal",
+            "options": [
+                {
+                    "text": "Joint pain or stiffness",
+                    "next": null,
+                    "scores": {
+                        "arthritis": 3,
+                        "overuse_injury": 2
+                    }
+                },
+                {
+                    "text": "Muscle aches or soreness",
+                    "next": null,
+                    "scores": {
+                        "muscle_strain": 3,
+                        "flu": 1
+                    }
+                },
+                {
+                    "text": "Back pain",
+                    "next": null,
+                    "scores": {
+                        "back_strain": 3,
+                        "disc_issue": 2
+                    }
+                },
+                {
+                    "text": "Swelling in joints",
+                    "next": null,
+                    "scores": {
+                        "arthritis": 4,
+                        "injury": 2
+                    }
+                }
+            ]
+        },
+        "skin_main": {
+            "question": "What skin symptom are you experiencing?",
+            "category": "skin",
+            "options": [
+                {
+                    "text": "Itchy rash",
+                    "next": null,
+                    "scores": {
+                        "eczema": 3,
+                        "allergy": 3
+                    }
+                },
+                {
+                    "text": "Red, inflamed patches",
+                    "next": null,
+                    "scores": {
+                        "eczema": 3,
+                        "dermatitis": 2
+                    }
+                },
+                {
+                    "text": "Hives or welts",
+                    "next": null,
+                    "scores": {
+                        "allergy": 4
+                    }
+                },
+                {
+                    "text": "Dry, flaky skin",
+                    "next": null,
+                    "scores": {
+                        "eczema": 3,
+                        "dry_skin": 3
+                    }
+                }
+            ]
+        },
+        "general_main": {
+            "question": "What general symptom are you experiencing?",
+            "category": "general",
+            "options": [
+                {
+                    "text": "Persistent fatigue",
+                    "next": "fatigue_detail",
+                    "scores": {
+                        "anemia": 2,
+                        "thyroid": 2
+                    }
+                },
+                {
+                    "text": "Fever",
+                    "next": "fever_detail",
+                    "scores": {
+                        "flu": 2,
+                        "infection": 2
+                    }
+                },
+                {
+                    "text": "Unexplained weight change",
+                    "next": null,
+                    "scores": {
+                        "thyroid": 3,
+                        "diabetes": 2
+                    }
+                },
+                {
+                    "text": "Sleep problems",
+                    "next": null,
+                    "scores": {
+                        "insomnia": 3,
+                        "anxiety": 2
+                    }
+                }
+            ]
+        },
+        "fatigue_detail": {
+            "question": "How long have you been feeling fatigued?",
+            "category": "general",
+            "options": [
+                {
+                    "text": "A few days",
+                    "next": null,
+                    "scores": {
+                        "common_cold": 2,
+                        "flu": 2
+                    }
+                },
+                {
+                    "text": "1-2 weeks",
+                    "next": null,
+                    "scores": {
+                        "anemia": 2,
+                        "viral_infection": 2
+                    }
+                },
+                {
+                    "text": "More than a month",
+                    "next": null,
+                    "scores": {
+                        "anemia": 3,
+                        "thyroid": 3,
+                        "depression": 2
+                    }
+                },
+                {
+                    "text": "Several months",
+                    "next": null,
+                    "scores": {
+                        "chronic_fatigue": 4,
+                        "thyroid": 2
+                    }
+                }
+            ]
+        },
+        "fever_detail": {
+            "question": "What is your temperature range?",
+            "category": "general",
+            "options": [
+                {
+                    "text": "Low grade (99-100°F / 37.2-37.8°C)",
+                    "next": null,
+                    "scores": {
+                        "common_cold": 3
+                    }
+                },
+                {
+                    "text": "Moderate (100-102°F / 37.8-38.9°C)",
+                    "next": null,
+                    "scores": {
+                        "flu": 3,
+                        "infection": 2
+                    }
+                },
+                {
+                    "text": "High (above 102°F / 38.9°C)",
+                    "next": null,
+                    "scores": {
+                        "flu": 3,
+                        "serious_infection": 3
+                    }
+                },
+                {
+                    "text": "Not sure / haven't checked",
+                    "next": null,
+                    "scores": {
+                        "flu": 2,
+                        "common_cold": 2
+                    }
+                }
+            ]
+        }
+    },
+    "conditions": {
+        "migraine": {
+            "description": "A neurological condition causing severe, often one-sided headaches, sometimes with nausea and light sensitivity.",
+            "recommendation": "Rest in a dark, quiet room. Over-the-counter pain relievers may help. If migraines are frequent, consult a neurologist."
+        },
+        "tension_headache": {
+            "description": "The most common type of headache, often caused by stress, poor posture, or muscle tension.",
+            "recommendation": "Try stress management, proper posture, and OTC pain relief. Apply a warm or cold compress to your head or neck."
+        },
+        "chronic_headache": {
+            "description": "Headaches occurring 15 or more days per month for at least 3 months.",
+            "recommendation": "Please consult a healthcare provider for proper evaluation and management plan."
+        },
+        "vertigo": {
+            "description": "A sensation of spinning or dizziness, often related to inner ear issues.",
+            "recommendation": "Avoid sudden head movements. Consult an ENT specialist for proper diagnosis."
+        },
+        "anemia": {
+            "description": "A condition where you lack enough healthy red blood cells to carry oxygen to your tissues.",
+            "recommendation": "A blood test can confirm. Increase iron-rich foods and consult your doctor."
+        },
+        "common_cold": {
+            "description": "A viral infection of the upper respiratory tract causing runny nose, sore throat, and cough.",
+            "recommendation": "Rest, stay hydrated, and use OTC cold remedies. Usually resolves in 7-10 days."
+        },
+        "flu": {
+            "description": "Influenza — a viral infection with fever, body aches, fatigue, and respiratory symptoms.",
+            "recommendation": "Rest, fluids, and OTC medication. See a doctor if symptoms are severe or you're in a high-risk group."
+        },
+        "strep_throat": {
+            "description": "A bacterial infection causing severe sore throat, fever, and swollen lymph nodes.",
+            "recommendation": "Requires antibiotics. Please see a doctor for a throat swab test."
+        },
+        "bronchitis": {
+            "description": "Inflammation of the bronchial tubes, often causing persistent cough with mucus.",
+            "recommendation": "Rest, fluids, and OTC cough medicine. See a doctor if cough lasts more than 3 weeks."
+        },
+        "asthma": {
+            "description": "A chronic condition causing airway inflammation, wheezing, and breathing difficulty.",
+            "recommendation": "Consult a pulmonologist. Avoid triggers and use prescribed inhalers."
+        },
+        "allergy": {
+            "description": "An immune system reaction to substances like pollen, dust, food, or medications.",
+            "recommendation": "Identify and avoid triggers. Antihistamines may help. See an allergist for testing."
+        },
+        "gastritis": {
+            "description": "Inflammation of the stomach lining causing pain, nausea, and bloating.",
+            "recommendation": "Avoid spicy/acidic foods, reduce stress, and consider antacids. See a doctor if persistent."
+        },
+        "ibs": {
+            "description": "Irritable Bowel Syndrome — a disorder affecting the large intestine with cramping and bowel changes.",
+            "recommendation": "Dietary changes (low FODMAP), stress management, and fiber supplements may help."
+        },
+        "gastroenteritis": {
+            "description": "Stomach flu — inflammation of the stomach and intestines, usually caused by a virus.",
+            "recommendation": "Stay hydrated with clear fluids. See a doctor if symptoms last more than 3 days."
+        },
+        "eczema": {
+            "description": "A condition causing inflamed, itchy, red skin patches.",
+            "recommendation": "Moisturize regularly, avoid irritants, and use prescribed topical creams."
+        },
+        "arthritis": {
+            "description": "Joint inflammation causing pain, stiffness, and swelling.",
+            "recommendation": "Low-impact exercise, OTC anti-inflammatory drugs, and consult a rheumatologist."
+        },
+        "thyroid": {
+            "description": "Thyroid disorders can cause fatigue, weight changes, and mood shifts.",
+            "recommendation": "A blood test (TSH) can diagnose. Consult an endocrinologist."
+        },
+        "anxiety": {
+            "description": "A mental health condition with excessive worry, restlessness, and physical symptoms.",
+            "recommendation": "Consider therapy (CBT), stress management, and consult a mental health professional."
+        },
+        "acid_reflux": {
+            "description": "Gastroesophageal reflux — stomach acid flowing back into the esophagus causing heartburn.",
+            "recommendation": "Avoid trigger foods, eat smaller meals, don't lie down after eating. OTC antacids may help."
+        },
+        "serious_condition": {
+            "description": "Your symptoms may indicate a condition requiring prompt medical attention.",
+            "recommendation": "Please seek medical attention as soon as possible. Contact your healthcare provider or visit an urgent care facility."
+        },
+        "food_poisoning": {
+            "description": "Illness from consuming contaminated food or water.",
+            "recommendation": "Stay hydrated, rest, and see a doctor if symptoms are severe or last more than 2 days."
+        },
+        "dehydration": {
+            "description": "Insufficient fluid intake leading to dizziness, fatigue, and dry mouth.",
+            "recommendation": "Drink plenty of water and electrolyte solutions. Seek medical help if severe."
+        }
+    }
+}
