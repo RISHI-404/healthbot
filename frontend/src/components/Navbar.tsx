@@ -11,11 +11,11 @@ export default function Navbar({ onToggleSidebar, onNewChat }: Props) {
     const { isDark, toggle } = useTheme();
 
     return (
-        <nav className="h-14 flex items-center justify-between px-4 border-b bg-white dark:bg-[#0f172a] border-slate-200 dark:border-slate-800/60 flex-shrink-0">
+        <nav className="h-14 flex items-center justify-between px-4 border-b bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-xl border-[#ccfbf1] dark:border-[rgba(20,184,166,0.1)] flex-shrink-0">
             {/* Left: sidebar toggle */}
             <button
                 onClick={onToggleSidebar}
-                className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa] dark:hover:bg-[#1a2332] transition-colors"
             >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -36,7 +36,7 @@ export default function Navbar({ onToggleSidebar, onNewChat }: Props) {
                 <motion.button
                     whileTap={{ scale: 0.85 }}
                     onClick={toggle}
-                    className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa] dark:hover:bg-[#1a2332] transition-colors"
                     aria-label="Toggle dark mode"
                 >
                     <AnimatePresence mode="wait" initial={false}>
@@ -48,7 +48,7 @@ export default function Navbar({ onToggleSidebar, onNewChat }: Props) {
                             </motion.svg>
                         ) : (
                             <motion.svg key="moon" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}
-                                className="w-5 h-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round"
                                     d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                             </motion.svg>

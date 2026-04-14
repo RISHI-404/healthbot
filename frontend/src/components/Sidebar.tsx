@@ -33,19 +33,19 @@ function groupByDate(convs: Conversation[]): GroupedConversations[] {
     return Object.entries(g).filter(([, v]) => v.length > 0).map(([label, conversations]) => ({ label, conversations }));
 }
 
-/* HealthBot SVG Logo */
+/* HealthBot SVG Logo — teal/emerald gradient */
 function Logo() {
     return (
         <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="40" height="40" rx="12" fill="url(#lg)" />
             <path d="M10 14C10 11.79 11.79 10 14 10H26C28.21 10 30 11.79 30 14V22C30 24.21 28.21 26 26 26H18L13 30V26H14C11.79 26 10 24.21 10 22V14Z"
                 fill="white" fillOpacity="0.95" />
-            <rect x="18" y="13" width="4" height="12" rx="1.5" fill="#4f46e5" />
-            <rect x="14" y="17" width="12" height="4" rx="1.5" fill="#4f46e5" />
+            <rect x="18" y="13" width="4" height="12" rx="1.5" fill="#0d9488" />
+            <rect x="14" y="17" width="12" height="4" rx="1.5" fill="#0d9488" />
             <defs>
                 <linearGradient id="lg" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-                    <stop stopColor="#6366f1" />
-                    <stop offset="1" stopColor="#4f46e5" />
+                    <stop stopColor="#14b8a6" />
+                    <stop offset="1" stopColor="#10b981" />
                 </linearGradient>
             </defs>
         </svg>
@@ -78,11 +78,11 @@ export default function Sidebar({ conversations, activeId, onSelect, onDelete, i
     const content = (
         <div className="flex flex-col h-full">
             {/* Logo + brand */}
-            <div className="px-4 pt-5 pb-4 flex items-center gap-3 border-b border-slate-200 dark:border-slate-800/60">
+            <div className="px-4 pt-5 pb-4 flex items-center gap-3 border-b border-[#ccfbf1] dark:border-[rgba(20,184,166,0.1)]">
                 <Logo />
                 <div>
                     <h1 className="font-bold text-[15px] text-slate-800 dark:text-white leading-tight">HealthBot</h1>
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold uppercase tracking-widest">AI Assistant</p>
+                    <p className="text-[10px] text-teal-500 dark:text-teal-400 font-semibold uppercase tracking-widest">AI Assistant</p>
                 </div>
             </div>
 
@@ -93,8 +93,8 @@ export default function Sidebar({ conversations, activeId, onSelect, onDelete, i
                     return (
                         <Link key={item.to} to={item.to} onClick={() => { if (window.innerWidth < 768) onToggle(); }}
                             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200 ${active
-                                ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400'
-                                : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200'
+                                ? 'bg-[#f0fdfa] dark:bg-teal-500/10 text-teal-600 dark:text-teal-400'
+                                : 'text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa] dark:hover:bg-[#1a2332] hover:text-slate-700 dark:hover:text-slate-200'
                                 }`}>
                             {item.icon}
                             {item.label}
@@ -121,8 +121,8 @@ export default function Sidebar({ conversations, activeId, onSelect, onDelete, i
                             {group.conversations.map((conv) => (
                                 <div key={conv.id}
                                     className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-150 ${activeId === conv.id
-                                        ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white'
-                                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-700 dark:hover:text-slate-300'
+                                        ? 'bg-[#f0fdfa] dark:bg-[#1a2332] text-teal-700 dark:text-teal-300'
+                                        : 'text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa]/60 dark:hover:bg-[#1a2332]/60 hover:text-slate-700 dark:hover:text-slate-300'
                                         }`}
                                     onClick={() => { onSelect(conv.id); if (window.innerWidth < 768) onToggle(); }}>
                                     <span className="flex-1 text-[13px] truncate">{conv.title}</span>
@@ -159,7 +159,7 @@ export default function Sidebar({ conversations, activeId, onSelect, onDelete, i
                     <motion.aside
                         initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                        className="fixed z-40 top-0 left-0 bottom-0 w-[260px] bg-white dark:bg-[#0f172a] border-r border-slate-200 dark:border-slate-800/60 flex flex-col shadow-xl">
+                        className="fixed z-40 top-0 left-0 bottom-0 w-[260px] bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-xl border-r border-[#ccfbf1] dark:border-[rgba(20,184,166,0.1)] flex flex-col shadow-xl">
                         {content}
                     </motion.aside>
                 )}

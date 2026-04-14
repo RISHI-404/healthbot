@@ -31,7 +31,7 @@ export default function ChatInput({ onSend, onAbort, isStreaming, disabled }: Pr
 
     return (
         <div className="p-4 max-w-3xl mx-auto w-full">
-            <div className="flex items-end gap-3 bg-white dark:bg-[#1e293b] rounded-2xl border border-slate-200 dark:border-slate-700/60 px-4 py-2 focus-within:border-indigo-400/60 focus-within:ring-1 focus-within:ring-indigo-400/20 transition-all duration-200 shadow-sm">
+            <div className="flex items-end gap-3 bg-white/80 dark:bg-[#1a2332]/80 backdrop-blur-xl rounded-2xl border border-[#ccfbf1] dark:border-[rgba(20,184,166,0.12)] px-4 py-2 focus-within:border-teal-400/60 focus-within:ring-1 focus-within:ring-teal-400/20 transition-all duration-200 shadow-sm">
                 <textarea
                     ref={textareaRef}
                     rows={1}
@@ -56,7 +56,7 @@ export default function ChatInput({ onSend, onAbort, isStreaming, disabled }: Pr
                     <motion.button
                         whileTap={{ scale: 0.85 }}
                         onClick={handleSubmit}
-                        className="flex-shrink-0 w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center hover:bg-indigo-600 hover:shadow-lg transition-all duration-200"
+                        className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 text-white flex items-center justify-center hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-200"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />

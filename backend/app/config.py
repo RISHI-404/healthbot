@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     # NVIDIA AI
     NVIDIA_API_KEY: str = ""
 
+    # Local AI (TinyLlama + optional LoRA adapter)
+    LOCAL_AI_MODEL: str = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    LOCAL_AI_ENABLED: bool = True
+    LOCAL_AI_QUANTIZE: bool = False          # set True if CUDA GPU available
+    LOCAL_AI_MAX_TOKENS: int = 300
+    LOCAL_AI_ADAPTER_PATH: str = ""          # e.g. models/medical_lora_adapter
+
     # JWT
     JWT_SECRET_KEY: str = "dev-secret-key-change-in-production"
     JWT_ALGORITHM: str = "HS256"

@@ -46,7 +46,7 @@ function AppContent() {
     };
 
     return (
-        <div className="h-screen flex flex-col bg-slate-50 dark:bg-[#0b1120]">
+        <div className="h-screen flex flex-col bg-[#f0fdfa] dark:bg-[#0a0f1a]">
             {/* Top bar */}
             <Navbar
                 onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}

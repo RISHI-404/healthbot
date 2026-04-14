@@ -53,3 +53,5 @@ Thumbs.db
 # Project specific
 frontend/dist/
 backend/test.db
+backend/*.db
+backend/healthcare_chatbot.db

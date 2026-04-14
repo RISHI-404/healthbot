@@ -11,23 +11,22 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   margin: 0;
-  /* Light mode */
-  background-color: #f8fafc;
+  background-color: #f0fdfa;
   color: #1e293b;
 }
 
 .dark body,
 body.dark-body {
-  background-color: #0b1120;
+  background-color: #0a0f1a;
   color: #e2e8f0;
 }
 
 html.dark {
-  background-color: #0b1120;
+  background-color: #0a0f1a;
 }
 
 html.dark body {
-  background-color: #0b1120;
+  background-color: #0a0f1a;
   color: #e2e8f0;
 }
 
@@ -41,42 +40,42 @@ html.dark body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #99f6e4;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #5eead4;
 }
 
 html.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #1a2332;
 }
 
 html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #283548;
 }
 
 /* ─── Buttons ────────────────────────────────────────── */
 @layer components {
   .btn-new-chat {
     @apply flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold text-white transition-all duration-200 ease-in-out;
-    background: linear-gradient(135deg, #4f46e5, #6366f1);
+    background: linear-gradient(135deg, #14b8a6, #10b981);
   }
 
   .btn-new-chat:hover {
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.35);
+    box-shadow: 0 0 24px rgba(20, 184, 166, 0.4);
     filter: brightness(1.1);
   }
 
   .btn-primary {
     @apply px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all duration-200;
-    background-color: #6366f1;
+    background: linear-gradient(135deg, #14b8a6, #10b981);
   }
 
   .btn-primary:hover {
-    background-color: #4f46e5;
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+    box-shadow: 0 0 24px rgba(20, 184, 166, 0.35);
+    filter: brightness(1.1);
   }
 
   .btn-primary:disabled {
@@ -86,23 +85,23 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   .btn-secondary {
     @apply px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200;
     color: #64748b;
-    background-color: #f1f5f9;
-    border: 1px solid #e2e8f0;
+    background-color: #f0fdfa;
+    border: 1px solid #ccfbf1;
   }
 
   html.dark .btn-secondary {
     color: #cbd5e1;
-    background-color: #1e293b;
-    border-color: #334155;
+    background-color: #1a2332;
+    border-color: rgba(20, 184, 166, 0.15);
   }
 
   .btn-secondary:hover {
-    background-color: #e2e8f0;
-    color: #1e293b;
+    background-color: #ccfbf1;
+    color: #0f766e;
   }
 
   html.dark .btn-secondary:hover {
-    background-color: #334155;
+    background-color: #283548;
     color: #fff;
   }
 
@@ -110,53 +109,55 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   .card {
     @apply rounded-2xl p-5;
     background-color: #fff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #ccfbf1;
   }
 
   html.dark .card {
-    background-color: #1e293b;
-    border-color: rgba(51, 65, 85, 0.5);
+    background-color: #1a2332;
+    border-color: rgba(20, 184, 166, 0.1);
   }
 
   /* ─── Suggestion Cards ───────────────────────────── */
   .suggestion-card {
     @apply flex items-center gap-3 px-4 py-3.5 rounded-[14px] text-[14px] font-medium cursor-pointer transition-all duration-200 ease-in-out;
-    background-color: #f1f5f9;
-    border: 1px solid #e2e8f0;
+    background-color: #f0fdfa;
+    border: 1px solid #ccfbf1;
     color: #475569;
   }
 
   html.dark .suggestion-card {
-    background-color: #1e293b;
-    border-color: rgba(51, 65, 85, 0.4);
+    background-color: rgba(26, 35, 50, 0.8);
+    border-color: rgba(20, 184, 166, 0.12);
     color: #cbd5e1;
+    backdrop-filter: blur(12px);
   }
 
   .suggestion-card:hover {
-    background-color: #e2e8f0;
-    border-color: rgba(99, 102, 241, 0.3);
-    color: #1e293b;
+    background-color: #ccfbf1;
+    border-color: rgba(20, 184, 166, 0.4);
+    color: #0f766e;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 16px rgba(20, 184, 166, 0.15);
   }
 
   html.dark .suggestion-card:hover {
-    background-color: #334155;
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    background-color: rgba(20, 184, 166, 0.1);
+    border-color: rgba(20, 184, 166, 0.3);
+    color: #5eead4;
+    box-shadow: 0 4px 20px rgba(20, 184, 166, 0.15);
   }
 
   /* ─── Input Field ────────────────────────────────── */
   .input-field {
     @apply w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-all duration-200;
     background-color: #fff;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #ccfbf1;
     color: #1e293b;
   }
 
   html.dark .input-field {
-    background-color: #1e293b;
-    border-color: #334155;
+    background-color: #1a2332;
+    border-color: rgba(20, 184, 166, 0.15);
     color: #e2e8f0;
   }
 
@@ -169,27 +170,27 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   }
 
   .input-field:focus {
-    border-color: rgba(99, 102, 241, 0.5);
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+    border-color: rgba(20, 184, 166, 0.5);
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
   }
 
   /* ─── Chat bubbles ───────────────────────────────── */
   .bubble-ai {
     @apply rounded-2xl rounded-bl-md px-4 py-3;
-    background-color: #f1f5f9;
+    background-color: #f0fdfa;
     color: #1e293b;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #ccfbf1;
   }
 
   html.dark .bubble-ai {
-    background-color: #1e293b;
+    background-color: #1a2332;
     color: #e2e8f0;
-    border-color: rgba(51, 65, 85, 0.5);
+    border-color: rgba(20, 184, 166, 0.1);
   }
 
   .bubble-user {
     @apply rounded-2xl rounded-br-md px-4 py-3;
-    background-color: #6366f1;
+    background: linear-gradient(135deg, #14b8a6, #10b981);
     color: #fff;
   }
 }
@@ -264,24 +265,25 @@ html.dark .prose-custom li {
 }
 
 .prose-custom li::marker {
-  color: #6366f1;
+  color: #14b8a6;
 }
 
 .prose-custom code {
   padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
-  background-color: #f1f5f9;
-  color: #6366f1;
+  background-color: #f0fdfa;
+  color: #0d9488;
   font-size: 13px;
   font-family: 'Fira Code', monospace;
 }
 
 html.dark .prose-custom code {
-  background-color: #0f172a;
+  background-color: #0a0f1a;
+  color: #2dd4bf;
 }
 
 .prose-custom pre {
-  background-color: #f1f5f9;
+  background-color: #f0fdfa;
   border-radius: 0.5rem;
   padding: 0.75rem;
   margin-bottom: 0.5rem;
@@ -289,7 +291,7 @@ html.dark .prose-custom code {
 }
 
 html.dark .prose-custom pre {
-  background-color: #0f172a;
+  background-color: #0a0f1a;
 }
 
 .prose-custom pre code {
@@ -312,29 +314,29 @@ html.dark .prose-custom strong {
 }
 
 .prose-custom a {
-  color: #6366f1;
+  color: #14b8a6;
   text-decoration: underline;
 }
 
 .prose-custom blockquote {
-  border-left: 2px solid #6366f1;
+  border-left: 2px solid #14b8a6;
   padding-left: 0.75rem;
   font-style: italic;
   color: #64748b;
   margin: 0.5rem 0;
 }
 
-/* ─── Typing dots ────────────────────────────────────── */
+/* ─── Typing dots (shimmer version) ──────────────────── */
 .typing-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #94a3b8;
+  background: linear-gradient(135deg, #14b8a6, #10b981);
   animation: bounce-dot 1.2s ease-in-out infinite;
 }
 
 html.dark .typing-dot {
-  background-color: #64748b;
+  background: linear-gradient(135deg, #2dd4bf, #34d399);
 }
 
 .typing-dot:nth-child(2) {
@@ -346,7 +348,6 @@ html.dark .typing-dot {
 }
 
 @keyframes bounce-dot {
-
   0%,
   60%,
   100% {
@@ -364,7 +365,7 @@ html.dark .typing-dot {
   display: inline-block;
   width: 2px;
   height: 16px;
-  background-color: #6366f1;
+  background: linear-gradient(180deg, #14b8a6, #10b981);
   margin-left: 2px;
   vertical-align: text-bottom;
   border-radius: 9999px;
@@ -384,7 +385,6 @@ html.dark .typing-dot {
 }
 
 @keyframes emergency-pulse {
-
   0%,
   100% {
     border-color: rgba(239, 68, 68, 0.4);
@@ -392,5 +392,47 @@ html.dark .typing-dot {
 
   50% {
     border-color: rgba(239, 68, 68, 0.7);
+  }
+}
+
+/* ─── AI Avatar Pulse (during streaming) ─────────────── */
+.avatar-pulse {
+  position: relative;
+}
+
+.avatar-pulse::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #14b8a6, #10b981);
+  opacity: 0;
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* ─── Gradient icon animation ────────────────────────── */
+.gradient-icon-bg {
+  background: linear-gradient(135deg, #14b8a6, #10b981, #0d9488, #14b8a6);
+  background-size: 300% 300%;
+  animation: gradient-shift 3s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
   }
 }

@@ -2,15 +2,23 @@
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import text
 from app.config import settings
 
 
 # Create async engine
 if settings.is_sqlite:
+    from sqlalchemy.pool import StaticPool
+
+    # StaticPool forces all async sessions to share a single underlying
+    # SQLite connection, which completely eliminates "database is locked"
+    # errors caused by concurrent writers.  SQLite's asyncio event-loop
+    # serialisation ensures writes never actually race.
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=settings.APP_DEBUG,
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
 else:
     engine = create_async_engine(
@@ -43,6 +51,11 @@ async def get_db():
 
 
 async def init_db():
-    """Create all tables (for dev/testing)."""
+    """Create all tables and configure SQLite for concurrent async access."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        if settings.is_sqlite:
+            # WAL + synchronous=NORMAL: safe and fast for concurrent access
+            await conn.execute(text("PRAGMA journal_mode=WAL"))
+            await conn.execute(text("PRAGMA synchronous=NORMAL"))

@@ -1,5 +1,6 @@
 """Chat routes — send messages, stream responses, manage conversations."""
 
+import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import StreamingResponse
@@ -13,8 +14,29 @@ from app.schemas.chat import (
 )
 from app.services import chat_service
 from app.services.emergency_detector import detect_emergency, EMERGENCY_RESPONSE
+from app.services.nlp_pipeline import NLPPipeline
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Shared NLP pipeline instance (models loaded lazily on first request)
+_nlp_pipeline = NLPPipeline()
+_nlp_ready = False
+
+
+async def _get_nlp_pipeline() -> NLPPipeline:
+    """Ensure NLP pipeline is initialised before use."""
+    global _nlp_ready
+    if not _nlp_ready:
+        await _nlp_pipeline.initialize()
+        _nlp_ready = True
+    return _nlp_pipeline
+
+
+# Confidence thresholds for hybrid routing
+NLP_HIGH_CONFIDENCE  = 0.80   # >= this  → use NLP ML response
+NLP_MID_CONFIDENCE   = 0.50   # >= this  → use local AI model
+                               # <  0.50  → fall back to NVIDIA API
 
 SESSION_COOKIE = "healthbot_session"
 
@@ -76,25 +98,63 @@ async def send_message(
             },
         )
 
-    # Step 2: Get context and generate Gemini response
+    # Step 2: Get conversation context (shared by all AI tiers)
     context = await chat_service.get_conversation_context(db, conversation.id)
-    gemini = request.app.state.gemini_service
 
-    try:
-        response_text = await gemini.generate_response(msg.message, context)
-    except Exception as e:
-        import logging
-        logging.error(f"Gemini API error: {type(e).__name__}: {e}")
-        response_text = (
-            "I'm sorry, I'm having trouble processing your request right now. "
-            "Please try again in a moment. If you're experiencing a medical emergency, "
-            "please call emergency services immediately."
-        )
+    # ------------------------------------------------------------------ #
+    # Step 3: HYBRID AI DECISION SYSTEM                                   #
+    #   Tier 1 (confidence >= 0.80) → NLP ML response (fast, local)      #
+    #   Tier 2 (confidence 0.50-0.79) → Local TinyLlama model            #
+    #   Tier 3 (confidence < 0.50)  → NVIDIA API fallback                #
+    # ------------------------------------------------------------------ #
+    nlp = await _get_nlp_pipeline()
+    nlp_result = await nlp.process(msg.message, context)
 
-    # Save assistant response
+    confidence: float = nlp_result.get("confidence", 0.0)
+    ai_tier: str = ""
+    response_text: str = ""
+
+    if confidence >= NLP_HIGH_CONFIDENCE:
+        # ── Tier 1: High-confidence NLP ML response ──────────────────────
+        ai_tier = "nlp_ml"
+        response_text = nlp_result["response"]
+        logger.info(f"[HybridAI] Tier 1 (NLP ML) — confidence={confidence:.2f}")
+
+    elif confidence >= NLP_MID_CONFIDENCE:
+        # ── Tier 2: Local TinyLlama model ───────────────────────────────
+        ai_tier = "local_ai"
+        local_ai = getattr(request.app.state, "local_ai_service", None)
+        if local_ai is not None and local_ai._model_id:
+            try:
+                response_text = await local_ai.generate_response(msg.message, context)
+                logger.info(f"[HybridAI] Tier 2 (Local AI) — confidence={confidence:.2f}")
+            except Exception as exc:
+                logger.warning(f"[HybridAI] Local AI failed ({exc}), falling back to NVIDIA")
+                ai_tier = "nvidia_api_fallback"
+        else:
+            # Local AI not configured — drop straight to NVIDIA
+            ai_tier = "nvidia_api_fallback"
+            logger.info("[HybridAI] Local AI not configured, using NVIDIA fallback")
+
+    if not response_text or ai_tier in ("nvidia_api_fallback", ""):
+        # ── Tier 3: NVIDIA API fallback ──────────────────────────────────
+        ai_tier = ai_tier or "nvidia_api"
+        gemini = request.app.state.gemini_service
+        try:
+            response_text = await gemini.generate_response(msg.message, context)
+            logger.info(f"[HybridAI] Tier 3 (NVIDIA API) — confidence={confidence:.2f}")
+        except Exception as exc:
+            logger.error(f"[HybridAI] NVIDIA API error: {type(exc).__name__}: {exc}")
+            response_text = (
+                "I'm sorry, I'm having trouble processing your request right now. "
+                "Please try again in a moment. If you're experiencing a medical emergency, "
+                "please call emergency services immediately."
+            )
+
+    # Save assistant response (record which AI tier handled it)
     await chat_service.save_message(
         db, conversation.id, "assistant", response_text,
-        intent="gemini_response",
+        intent=ai_tier,
     )
     await db.commit()
 
@@ -107,7 +167,8 @@ async def send_message(
             "Connection": "keep-alive",
             "X-Conversation-Id": str(conversation.id),
             "X-Is-Emergency": "false",
-            "Access-Control-Expose-Headers": "X-Conversation-Id, X-Is-Emergency",
+            "X-AI-Tier": ai_tier,
+            "Access-Control-Expose-Headers": "X-Conversation-Id, X-Is-Emergency, X-AI-Tier",
         },
     )
 
@@ -164,3 +225,39 @@ async def delete_conversation(
 
     await db.delete(conv)
     return {"message": "Conversation deleted."}
+
+
+@router.get("/ai-status", tags=["Chat"])
+async def ai_status(request: Request):
+    """
+    Health check endpoint for all AI service tiers.
+    GET /api/chat/ai-status
+    """
+    local_ai = getattr(request.app.state, "local_ai_service", None)
+    gemini   = getattr(request.app.state, "gemini_service", None)
+
+    local_ai_status = {
+        "enabled": local_ai is not None and bool(local_ai._model_id),
+        "model": getattr(local_ai, "_model_id", None),
+        "model_loaded": getattr(local_ai, "is_ready", False),
+        "adapter_path": getattr(local_ai, "_adapter_path", "") or None,
+    }
+
+    nvidia_status = {
+        "enabled": gemini is not None and gemini._client is not None,
+    }
+
+    return {
+        "hybrid_routing": {
+            "tier1_nlp_threshold": NLP_HIGH_CONFIDENCE,
+            "tier2_local_ai_threshold": NLP_MID_CONFIDENCE,
+            "description": (
+                f"confidence >= {NLP_HIGH_CONFIDENCE} → NLP ML | "
+                f"{NLP_MID_CONFIDENCE}-{NLP_HIGH_CONFIDENCE} → Local AI | "
+                f"< {NLP_MID_CONFIDENCE} → NVIDIA API"
+            ),
+        },
+        "tier1_nlp_ml": {"enabled": True, "description": "TF-IDF + Logistic Regression"},
+        "tier2_local_ai": local_ai_status,
+        "tier3_nvidia_api": nvidia_status,
+    }

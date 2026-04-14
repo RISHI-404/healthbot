@@ -25,6 +25,33 @@ async def lifespan(app: FastAPI):
         logging.warning(f"AI service not ready: {e}. Set NVIDIA_API_KEY in .env and restart.")
     app.state.gemini_service = gemini_service
 
+    # Initialize Local AI service (lazy model load on first request)
+    from app.services.local_ai_service import local_ai_service
+    if settings.LOCAL_AI_ENABLED:
+        import logging as _log
+        _log.getLogger(__name__).info(
+            f"Local AI enabled: {settings.LOCAL_AI_MODEL} "
+            f"(adapter: '{settings.LOCAL_AI_ADAPTER_PATH or 'none'}')"
+        )
+        local_ai_service.configure(
+            model_id=settings.LOCAL_AI_MODEL,
+            adapter_path=settings.LOCAL_AI_ADAPTER_PATH,
+            max_tokens=settings.LOCAL_AI_MAX_TOKENS,
+            use_quantize=settings.LOCAL_AI_QUANTIZE,
+        )
+    app.state.local_ai_service = local_ai_service
+
+    # Pre-warm NLP pipeline so the first chat request doesn't trigger
+    # a 30-60 second cold-start (spaCy + scikit-learn model loading).
+    import logging as _nlp_log
+    _nlp_log.getLogger(__name__).info("Pre-warming NLP pipeline...")
+    try:
+        from app.routers.chat import _get_nlp_pipeline
+        await _get_nlp_pipeline()
+        _nlp_log.getLogger(__name__).info("NLP pipeline ready.")
+    except Exception as _nlp_exc:
+        _nlp_log.getLogger(__name__).warning(f"NLP pre-warm failed (non-fatal): {_nlp_exc}")
+
     yield
 
     # Shutdown

@@ -16,11 +16,24 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.2.0
 
-# NLP & AI
+# NLP & AI (existing)
 nltk==3.9.1
 spacy==3.7.6
 scikit-learn==1.5.2
 joblib==1.4.2
+
+# Local AI — fine-tuned model inference (TinyLlama + LoRA)
+torch>=2.2.0
+transformers>=4.40.0
+accelerate>=0.27.0
+peft>=0.10.0
+
+# Fine-tuning only (run train_model.py) — safe to omit for inference-only deploys
+trl>=0.8.0
+datasets>=2.18.0
+
+# Optional: 8-bit quantisation (GPU only — skip on CPU)
+# bitsandbytes>=0.43.0
 
 # Security
 cryptography==43.0.1
