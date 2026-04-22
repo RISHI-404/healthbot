@@ -49,6 +49,22 @@ class Settings(BaseSettings):
     def is_sqlite(self) -> bool:
         return "sqlite" in self.DATABASE_URL
 
+    @property
+    def async_database_url(self) -> str:
+        """
+        Return an asyncpg-compatible DATABASE_URL.
+        Render injects standard postgres:// or postgresql:// URLs —
+        convert them to postgresql+asyncpg:// for SQLAlchemy async engine.
+        """
+        url = self.DATABASE_URL
+        # Handle legacy postgres:// scheme (Render uses this)
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        # Handle postgresql:// without asyncpg driver
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

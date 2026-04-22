@@ -15,14 +15,14 @@ if settings.is_sqlite:
     # errors caused by concurrent writers.  SQLite's asyncio event-loop
     # serialisation ensures writes never actually race.
     engine = create_async_engine(
-        settings.DATABASE_URL,
+        settings.async_database_url,
         echo=settings.APP_DEBUG,
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
 else:
     engine = create_async_engine(
-        settings.DATABASE_URL,
+        settings.async_database_url,
         echo=settings.APP_DEBUG,
         pool_size=20,
         max_overflow=10,
