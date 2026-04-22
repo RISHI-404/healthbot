@@ -82,14 +82,18 @@ async def update_conversation_title(
     await db.flush()
 
 
-async def stream_response(response_text: str) -> AsyncGenerator[str, None]:
+async def stream_response(response_text: str, structured_data: dict = None) -> AsyncGenerator[str, None]:
     """Stream response text token-by-token as SSE events."""
     words = response_text.split(" ")
     for i, word in enumerate(words):
         token = word + (" " if i < len(words) - 1 else "")
         yield f"data: {json.dumps({'token': token})}\n\n"
         await asyncio.sleep(0.03)
-    yield f"data: {json.dumps({'done': True})}\n\n"
+    # Include structured JSON in the done event (backwards compatible)
+    done_payload = {'done': True}
+    if structured_data:
+        done_payload['structured'] = structured_data
+    yield f"data: {json.dumps(done_payload)}\n\n"
 
 
 async def get_user_conversations(db: AsyncSession, session_id: str) -> List[Conversation]:

@@ -1,5 +1,18 @@
 """FastAPI application entry point with middleware and router registration."""
 
+import sys
+import logging
+
+# Fix Windows console encoding for emoji characters (💡🩺⚠️)
+# Without this, SQLAlchemy echo logging crashes on cp1252 terminals.
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    # Reconfigure all existing stream handlers to use UTF-8
+    for handler in logging.root.handlers:
+        if isinstance(handler, logging.StreamHandler) and hasattr(handler.stream, "reconfigure"):
+            handler.stream.reconfigure(encoding="utf-8", errors="replace")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager

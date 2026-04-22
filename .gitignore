@@ -54,4 +54,6 @@ Thumbs.db
 frontend/dist/
 backend/test.db
 backend/*.db
+backend/*.db-shm
+backend/*.db-wal
 backend/healthcare_chatbot.db

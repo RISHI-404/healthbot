@@ -94,7 +94,7 @@ export default function Sidebar({ conversations, activeId, onSelect, onDelete, i
                         <Link key={item.to} to={item.to} onClick={() => { if (window.innerWidth < 768) onToggle(); }}
                             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200 ${active
                                 ? 'bg-[#f0fdfa] dark:bg-teal-500/10 text-teal-600 dark:text-teal-400'
-                                : 'text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa] dark:hover:bg-[#1a2332] hover:text-slate-700 dark:hover:text-slate-200'
+                                : 'text-slate-500 dark:text-slate-400 hover:bg-[#f8fafc] dark:hover:bg-[#1a2332] hover:text-slate-700 dark:hover:text-slate-200'
                                 }`}>
                             {item.icon}
                             {item.label}
@@ -122,7 +122,7 @@ export default function Sidebar({ conversations, activeId, onSelect, onDelete, i
                                 <div key={conv.id}
                                     className={`group flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all duration-150 ${activeId === conv.id
                                         ? 'bg-[#f0fdfa] dark:bg-[#1a2332] text-teal-700 dark:text-teal-300'
-                                        : 'text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa]/60 dark:hover:bg-[#1a2332]/60 hover:text-slate-700 dark:hover:text-slate-300'
+                                        : 'text-slate-500 dark:text-slate-400 hover:bg-[#f8fafc] dark:hover:bg-[#1a2332]/60 hover:text-slate-700 dark:hover:text-slate-300'
                                         }`}
                                     onClick={() => { onSelect(conv.id); if (window.innerWidth < 768) onToggle(); }}>
                                     <span className="flex-1 text-[13px] truncate">{conv.title}</span>
@@ -159,7 +159,7 @@ export default function Sidebar({ conversations, activeId, onSelect, onDelete, i
                     <motion.aside
                         initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
                         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                        className="fixed z-40 top-0 left-0 bottom-0 w-[260px] bg-white/90 dark:bg-[#0f172a]/90 backdrop-blur-xl border-r border-[#ccfbf1] dark:border-[rgba(20,184,166,0.1)] flex flex-col shadow-xl">
+                        className="fixed z-40 top-0 left-0 bottom-0 w-[260px] bg-white/95 dark:bg-[#0f172a]/90 backdrop-blur-xl border-r border-[#e2e8f0] dark:border-[rgba(20,184,166,0.1)] flex flex-col shadow-xl">
                         {content}
                     </motion.aside>
                 )}

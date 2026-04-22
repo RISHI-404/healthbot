@@ -1,0 +1,3202 @@
+
+================================================================================
+HEALTHCARE CHATBOT - COMPLETE CODEBASE
+================================================================================
+Project: chatbot-2 (HealthBot - AI Healthcare Assistant)
+Stack: FastAPI (Python) Backend + React/TypeScript (Vite) Frontend
+================================================================================
+
+
+================================================================================
+FILE: .env.example
+================================================================================
+# Database
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/healthcare_chatbot
+DATABASE_URL_SYNC=postgresql://postgres:postgres@db:5432/healthcare_chatbot
+SQLITE_FALLBACK=false
+
+# Redis
+REDIS_URL=redis://redis:6379/0
+
+# JWT
+JWT_SECRET_KEY=change-me-to-a-secure-random-string-in-production
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
+
+# Encryption
+AES_ENCRYPTION_KEY=change-me-to-a-32-byte-hex-key-0123456789abcdef
+
+# CORS
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+# App
+APP_ENV=development
+APP_DEBUG=true
+
+# NVIDIA AI
+NVIDIA_API_KEY=your-nvidia-api-key-here
+
+
+================================================================================
+FILE: docker-compose.yml
+================================================================================
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: healthcare_db
+    environment:
+      POSTGRES_DB: healthcare_chatbot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: healthcare_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../Dockerfile.backend
+    container_name: healthcare_backend
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../Dockerfile.frontend
+    container_name: healthcare_frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+  nginx:
+    image: nginx:alpine
+    container_name: healthcare_nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+volumes:
+  pgdata:
+
+
+================================================================================
+FILE: Dockerfile.backend
+================================================================================
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download NLP models
+RUN python -m spacy download en_core_web_sm
+RUN python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('stopwords'); nltk.download('wordnet')"
+
+# Copy application code
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+
+================================================================================
+FILE: backend/requirements.txt
+================================================================================
+# Core
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-dotenv==1.0.1
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# Database
+sqlalchemy==2.0.35
+asyncpg==0.29.0
+aiosqlite==0.20.0
+alembic==1.13.3
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.0
+
+# NLP & AI
+nltk==3.9.1
+spacy==3.7.6
+scikit-learn==1.5.2
+joblib==1.4.2
+
+# Security
+cryptography==43.0.1
+redis==5.1.1
+
+# Utilities
+python-multipart==0.0.12
+httpx==0.27.2
+email-validator==2.3.0
+
+# Testing
+pytest==8.3.3
+pytest-asyncio==0.24.0
+httpx==0.27.2
+
+# OpenAI-compatible client (for NVIDIA API)
+openai
+
+
+================================================================================
+FILE: backend/app/main.py
+================================================================================
+"""FastAPI application entry point with middleware and router registration."""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+
+from app.config import settings
+from app.database import init_db
+from app.routers import auth, chat, symptom_checker, appointments
+from app.middleware.security_headers import SecurityHeadersMiddleware
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: startup and shutdown events."""
+    # Startup
+    await init_db()
+
+    # Initialize AI service (lazy — will retry on first request if key missing)
+    from app.services.gemini_service import gemini_service
+    try:
+        gemini_service.initialize()
+    except ValueError as e:
+        import logging
+        logging.warning(f"AI service not ready: {e}. Set NVIDIA_API_KEY in .env and restart.")
+    app.state.gemini_service = gemini_service
+
+    yield
+
+    # Shutdown
+    pass
+
+
+app = FastAPI(
+    title="Healthcare Chatbot API",
+    description="AI-Powered Advanced Healthcare Chatbot System",
+    version="2.0.0",
+    lifespan=lifespan,
+)
+
+# --- Middleware ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# --- Routers ---
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
+app.include_router(symptom_checker.router, prefix="/api/symptoms", tags=["Symptom Checker"])
+app.include_router(appointments.router, prefix="/api/appointments", tags=["Appointments"])
+
+
+@app.get("/api/health", tags=["Health"])
+async def health_check():
+    return {"status": "healthy", "version": "2.0.0"}
+
+
+================================================================================
+FILE: backend/app/config.py
+================================================================================
+"""Application configuration using Pydantic BaseSettings."""
+
+from pydantic_settings import BaseSettings
+from typing import List
+import os
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
+    # Database
+    DATABASE_URL: str = "sqlite+aiosqlite:///./healthcare_chatbot.db"
+    SQLITE_FALLBACK: bool = True
+
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # NVIDIA AI
+    NVIDIA_API_KEY: str = ""
+
+    # JWT
+    JWT_SECRET_KEY: str = "dev-secret-key-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # Encryption
+    AES_ENCRYPTION_KEY: str = "0123456789abcdef0123456789abcdef"
+
+    # CORS
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+
+    # App
+    APP_ENV: str = "development"
+    APP_DEBUG: bool = True
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+
+    @property
+    def is_sqlite(self) -> bool:
+        return "sqlite" in self.DATABASE_URL
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        extra = "ignore"
+
+
+settings = Settings()
+
+
+================================================================================
+FILE: backend/app/database.py
+================================================================================
+"""SQLAlchemy async database engine and session management."""
+
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
+from app.config import settings
+
+
+# Create async engine
+if settings.is_sqlite:
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.APP_DEBUG,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    engine = create_async_engine(
+        settings.DATABASE_URL,
+        echo=settings.APP_DEBUG,
+        pool_size=20,
+        max_overflow=10,
+    )
+
+# Session factory
+async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+class Base(DeclarativeBase):
+    """Base class for all ORM models."""
+    pass
+
+
+async def get_db():
+    """Dependency that provides a database session."""
+    async with async_session() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+async def init_db():
+    """Create all tables (for dev/testing)."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
+================================================================================
+FILE: backend/app/models/user.py
+================================================================================
+"""User database model."""
+
+import enum
+from datetime import datetime, timezone
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum as SQLEnum
+from app.database import Base
+
+
+class UserRole(str, enum.Enum):
+    PATIENT = "PATIENT"
+    CLINICIAN = "CLINICIAN"
+    ADMIN = "ADMIN"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    full_name = Column(String(255), nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(SQLEnum(UserRole), default=UserRole.PATIENT, nullable=False)
+    has_consented = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+================================================================================
+FILE: backend/app/models/conversation.py
+================================================================================
+"""Conversation and Message database models."""
+
+from datetime import datetime, timezone
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
+from sqlalchemy.orm import relationship
+from app.database import Base
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(64), nullable=False, index=True)
+    title = Column(String(255), default="New Conversation")
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan",
+                            order_by="Message.created_at")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(20), nullable=False)  # "user" or "assistant"
+    content = Column(Text, nullable=False)
+    intent = Column(String(100), nullable=True)
+    entities = Column(Text, nullable=True)
+    is_emergency = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    conversation = relationship("Conversation", back_populates="messages")
+
+
+================================================================================
+FILE: backend/app/models/appointment.py
+================================================================================
+"""Appointment database model."""
+
+from datetime import datetime, timezone
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from app.database import Base
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    doctor_name = Column(String(255), nullable=True)
+    location = Column(String(255), nullable=True)
+    notes = Column(String(1000), nullable=True)
+    scheduled_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+================================================================================
+FILE: backend/app/schemas/auth.py
+================================================================================
+"""Authentication Pydantic schemas."""
+
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
+from app.models.user import UserRole
+
+
+class UserRegister(BaseModel):
+    email: EmailStr
+    full_name: str = Field(..., min_length=2, max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+    role: UserRole = UserRole.PATIENT
+
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    role: UserRole
+    has_consented: bool
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class ConsentRequest(BaseModel):
+    accepted: bool = Field(..., description="User must accept the medical disclaimer")
+
+
+================================================================================
+FILE: backend/app/schemas/chat.py
+================================================================================
+"""Chat Pydantic schemas."""
+
+from pydantic import BaseModel, Field
+from typing import Optional, List
+from datetime import datetime
+
+
+class ChatMessageRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    conversation_id: Optional[int] = None
+
+
+class ChatMessageResponse(BaseModel):
+    id: int
+    role: str
+    content: str
+    intent: Optional[str] = None
+    entities: Optional[str] = None
+    is_emergency: bool = False
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationResponse(BaseModel):
+    id: int
+    title: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    message_count: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationDetailResponse(BaseModel):
+    id: int
+    title: str
+    is_active: bool
+    created_at: datetime
+    messages: List[ChatMessageResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+================================================================================
+FILE: backend/app/schemas/appointment.py
+================================================================================
+"""Appointment Pydantic schemas."""
+
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
+
+
+class AppointmentCreate(BaseModel):
+    title: str = Field(..., min_length=2, max_length=255)
+    doctor_name: Optional[str] = None
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    scheduled_at: datetime
+
+
+class AppointmentUpdate(BaseModel):
+    title: Optional[str] = None
+    doctor_name: Optional[str] = None
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+
+
+class AppointmentResponse(BaseModel):
+    id: int
+    title: str
+    doctor_name: Optional[str]
+    location: Optional[str]
+    notes: Optional[str]
+    scheduled_at: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+================================================================================
+FILE: backend/app/schemas/medication.py
+================================================================================
+"""Medication Pydantic schemas."""
+
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
+
+
+class MedicationCreate(BaseModel):
+    medication_name: str = Field(..., min_length=2, max_length=255)
+    dosage: str = Field(..., min_length=1, max_length=100)
+    frequency: str = Field(..., min_length=1, max_length=100)
+    time_of_day: Optional[str] = None
+    notes: Optional[str] = None
+    start_date: datetime
+    end_date: Optional[datetime] = None
+
+
+class MedicationUpdate(BaseModel):
+    medication_name: Optional[str] = None
+    dosage: Optional[str] = None
+    frequency: Optional[str] = None
+    time_of_day: Optional[str] = None
+    notes: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+
+class MedicationResponse(BaseModel):
+    id: int
+    medication_name: str
+    dosage: str
+    frequency: str
+    time_of_day: Optional[str]
+    notes: Optional[str]
+    start_date: datetime
+    end_date: Optional[datetime]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+================================================================================
+FILE: backend/app/schemas/admin.py
+================================================================================
+"""Admin Pydantic schemas."""
+
+from pydantic import BaseModel
+from typing import Optional
+from datetime import datetime
+from app.models.user import UserRole
+
+
+class AdminUserResponse(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    role: UserRole
+    has_consented: bool
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SystemMetrics(BaseModel):
+    total_users: int
+    total_conversations: int
+    total_messages: int
+    total_appointments: int
+    total_feedbacks: int
+    average_rating: Optional[float] = None
+
+
+class ClinicianNoteCreate(BaseModel):
+    patient_id: int
+    conversation_id: Optional[int] = None
+    content: str
+
+
+class ClinicianNoteResponse(BaseModel):
+    id: int
+    clinician_id: int
+    patient_id: int
+    conversation_id: Optional[int]
+    content: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+================================================================================
+FILE: backend/app/schemas/feedback.py
+================================================================================
+"""Feedback Pydantic schemas."""
+
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
+
+
+class FeedbackCreate(BaseModel):
+    message_id: Optional[int] = None
+    rating: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = None
+
+
+class FeedbackResponse(BaseModel):
+    id: int
+    user_id: int
+    message_id: Optional[int]
+    rating: int
+    comment: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+================================================================================
+FILE: backend/app/routers/auth.py
+================================================================================
+"""Authentication routes — register, login, consent, profile."""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.schemas.auth import UserRegister, UserLogin, TokenResponse, UserResponse, ConsentRequest
+from app.services.auth_service import create_user, get_user_by_email, verify_password
+from app.utils.jwt_handler import create_access_token, create_refresh_token
+from app.utils.dependencies import get_current_user
+from app.models.user import User
+
+router = APIRouter()
+
+
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
+    """Register a new user account."""
+    existing = await get_user_by_email(db, user_data.email)
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists.",
+        )
+    user = await create_user(db, user_data)
+    return user
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(credentials: UserLogin, db: AsyncSession = Depends(get_db)):
+    """Authenticate and receive JWT tokens."""
+    user = await get_user_by_email(db, credentials.email)
+    if not user or not verify_password(credentials.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+        )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated.",
+        )
+
+    access_token = create_access_token({"sub": str(user.id), "role": user.role.value})
+    refresh_token = create_refresh_token({"sub": str(user.id)})
+
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+
+
+@router.post("/consent")
+async def accept_consent(
+    consent: ConsentRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Accept the medical disclaimer / consent."""
+    if not consent.accepted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must accept the medical disclaimer to use the chat.",
+        )
+    current_user.has_consented = True
+    await db.flush()
+    return {"message": "Consent accepted successfully.", "has_consented": True}
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_profile(current_user: User = Depends(get_current_user)):
+    """Get current user profile."""
+    return current_user
+
+
+================================================================================
+FILE: backend/app/routers/chat.py
+================================================================================
+"""Chat routes — send messages, stream responses, manage conversations."""
+
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List
+
+from app.database import get_db
+from app.schemas.chat import (
+    ChatMessageRequest, ChatMessageResponse,
+    ConversationResponse, ConversationDetailResponse,
+)
+from app.services import chat_service
+from app.services.emergency_detector import detect_emergency, EMERGENCY_RESPONSE
+
+router = APIRouter()
+
+SESSION_COOKIE = "healthbot_session"
+
+
+def get_session_id(request: Request, response: Response) -> str:
+    """Get or create a session ID from cookies."""
+    session_id = request.cookies.get(SESSION_COOKIE)
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        response.set_cookie(
+            key=SESSION_COOKIE,
+            value=session_id,
+            max_age=60 * 60 * 24 * 365,  # 1 year
+            httponly=True,
+            samesite="lax",
+        )
+    return session_id
+
+
+@router.post("/send")
+async def send_message(
+    request: Request,
+    response: Response,
+    msg: ChatMessageRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a message and receive a streaming SSE response."""
+    session_id = get_session_id(request, response)
+
+    # Get or create conversation
+    conversation = await chat_service.get_or_create_conversation(
+        db, session_id, msg.conversation_id
+    )
+
+    # Save user message
+    await chat_service.save_message(db, conversation.id, "user", msg.message)
+
+    # Update title if first message
+    if msg.conversation_id is None:
+        await chat_service.update_conversation_title(db, conversation, msg.message)
+
+    # Step 1: Emergency detection
+    is_emergency, matched_keyword = detect_emergency(msg.message)
+    if is_emergency:
+        await chat_service.save_message(
+            db, conversation.id, "assistant", EMERGENCY_RESPONSE,
+            intent="emergency", is_emergency=True,
+        )
+        await db.commit()
+        return StreamingResponse(
+            chat_service.stream_response(EMERGENCY_RESPONSE),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Conversation-Id": str(conversation.id),
+                "X-Is-Emergency": "true",
+                "Access-Control-Expose-Headers": "X-Conversation-Id, X-Is-Emergency",
+            },
+        )
+
+    # Step 2: Get context and generate Gemini response
+    context = await chat_service.get_conversation_context(db, conversation.id)
+    gemini = request.app.state.gemini_service
+
+    try:
+        response_text = await gemini.generate_response(msg.message, context)
+    except Exception as e:
+        import logging
+        logging.error(f"Gemini API error: {type(e).__name__}: {e}")
+        response_text = (
+            "I'm sorry, I'm having trouble processing your request right now. "
+            "Please try again in a moment. If you're experiencing a medical emergency, "
+            "please call emergency services immediately."
+        )
+
+    # Save assistant response
+    await chat_service.save_message(
+        db, conversation.id, "assistant", response_text,
+        intent="gemini_response",
+    )
+    await db.commit()
+
+    # Stream the response
+    return StreamingResponse(
+        chat_service.stream_response(response_text),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Conversation-Id": str(conversation.id),
+            "X-Is-Emergency": "false",
+            "Access-Control-Expose-Headers": "X-Conversation-Id, X-Is-Emergency",
+        },
+    )
+
+
+@router.get("/conversations", response_model=List[ConversationResponse])
+async def list_conversations(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all conversations for the current session."""
+    session_id = get_session_id(request, response)
+    conversations = await chat_service.get_user_conversations(db, session_id)
+    return conversations
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
+async def get_conversation(
+    conversation_id: int,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a conversation with all messages."""
+    session_id = get_session_id(request, response)
+    conv = await chat_service.get_conversation_messages(db, conversation_id, session_id)
+    if not conv:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+    return conv
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(
+    conversation_id: int,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a conversation."""
+    from sqlalchemy import select
+    from app.models.conversation import Conversation
+
+    session_id = get_session_id(request, response)
+
+    result = await db.execute(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.session_id == session_id,
+        )
+    )
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+
+    await db.delete(conv)
+    return {"message": "Conversation deleted."}
+
+
+================================================================================
+FILE: backend/app/routers/appointments.py
+================================================================================
+"""Appointment CRUD routes."""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from typing import List
+
+from app.database import get_db
+from app.schemas.appointment import AppointmentCreate, AppointmentUpdate, AppointmentResponse
+from app.utils.dependencies import get_current_user
+from app.models.user import User
+from app.models.appointment import Appointment
+
+router = APIRouter()
+
+
+@router.get("/", response_model=List[AppointmentResponse])
+async def list_appointments(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all appointments for the current user."""
+    result = await db.execute(
+        select(Appointment)
+        .where(Appointment.user_id == current_user.id)
+        .order_by(Appointment.scheduled_at)
+    )
+    return result.scalars().all()
+
+
+@router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
+async def create_appointment(
+    data: AppointmentCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new appointment."""
+    appt = Appointment(user_id=current_user.id, **data.model_dump())
+    db.add(appt)
+    await db.flush()
+    await db.refresh(appt)
+    return appt
+
+
+@router.put("/{appointment_id}", response_model=AppointmentResponse)
+async def update_appointment(
+    appointment_id: int,
+    data: AppointmentUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update an existing appointment."""
+    result = await db.execute(
+        select(Appointment).where(
+            Appointment.id == appointment_id,
+            Appointment.user_id == current_user.id,
+        )
+    )
+    appt = result.scalar_one_or_none()
+    if not appt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found.")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(appt, key, value)
+    await db.flush()
+    await db.refresh(appt)
+    return appt
+
+
+@router.delete("/{appointment_id}")
+async def delete_appointment(
+    appointment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete an appointment."""
+    result = await db.execute(
+        select(Appointment).where(
+            Appointment.id == appointment_id,
+            Appointment.user_id == current_user.id,
+        )
+    )
+    appt = result.scalar_one_or_none()
+    if not appt:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found.")
+
+    await db.delete(appt)
+    return {"message": "Appointment deleted."}
+
+
+================================================================================
+FILE: backend/app/routers/medications.py
+================================================================================
+"""Medication Reminder CRUD routes."""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from typing import List
+
+from app.database import get_db
+from app.schemas.medication import MedicationCreate, MedicationUpdate, MedicationResponse
+from app.utils.dependencies import get_current_user
+from app.models.user import User
+from app.models.medication import MedicationReminder
+
+router = APIRouter()
+
+
+@router.get("/", response_model=List[MedicationResponse])
+async def list_medications(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all medication reminders for the current user."""
+    result = await db.execute(
+        select(MedicationReminder)
+        .where(MedicationReminder.user_id == current_user.id)
+        .order_by(MedicationReminder.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.post("/", response_model=MedicationResponse, status_code=status.HTTP_201_CREATED)
+async def create_medication(
+    data: MedicationCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Add a new medication reminder."""
+    med = MedicationReminder(user_id=current_user.id, **data.model_dump())
+    db.add(med)
+    await db.flush()
+    await db.refresh(med)
+    return med
+
+
+@router.put("/{medication_id}", response_model=MedicationResponse)
+async def update_medication(
+    medication_id: int,
+    data: MedicationUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update a medication reminder."""
+    result = await db.execute(
+        select(MedicationReminder).where(
+            MedicationReminder.id == medication_id,
+            MedicationReminder.user_id == current_user.id,
+        )
+    )
+    med = result.scalar_one_or_none()
+    if not med:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medication not found.")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(med, key, value)
+    await db.flush()
+    await db.refresh(med)
+    return med
+
+
+@router.delete("/{medication_id}")
+async def delete_medication(
+    medication_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a medication reminder."""
+    result = await db.execute(
+        select(MedicationReminder).where(
+            MedicationReminder.id == medication_id,
+            MedicationReminder.user_id == current_user.id,
+        )
+    )
+    med = result.scalar_one_or_none()
+    if not med:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medication not found.")
+
+    await db.delete(med)
+    return {"message": "Medication reminder deleted."}
+
+
+================================================================================
+FILE: backend/app/routers/feedback.py
+================================================================================
+"""Feedback routes."""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from typing import List
+
+from app.database import get_db
+from app.schemas.feedback import FeedbackCreate, FeedbackResponse
+from app.utils.dependencies import get_current_user
+from app.models.user import User
+from app.models.feedback import Feedback
+
+router = APIRouter()
+
+
+@router.post("/", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
+async def submit_feedback(
+    data: FeedbackCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit feedback/rating for a chat response."""
+    fb = Feedback(user_id=current_user.id, **data.model_dump())
+    db.add(fb)
+    await db.flush()
+    await db.refresh(fb)
+    return fb
+
+
+@router.get("/", response_model=List[FeedbackResponse])
+async def list_my_feedback(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all feedback submitted by the current user."""
+    result = await db.execute(
+        select(Feedback)
+        .where(Feedback.user_id == current_user.id)
+        .order_by(Feedback.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+================================================================================
+FILE: backend/app/routers/symptom_checker.py
+================================================================================
+"""Symptom Checker routes — no auth required."""
+
+import uuid
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+
+from app.services.symptom_checker import create_session, answer_question
+
+router = APIRouter()
+
+
+class SymptomStartResponse(BaseModel):
+    session_id: str
+    node_id: str
+    question: str
+    options: list
+    category: str
+    is_final: bool = False
+
+
+class SymptomAnswerRequest(BaseModel):
+    session_id: str
+    option_index: int
+
+
+@router.post("/start", response_model=SymptomStartResponse)
+async def start_symptom_check():
+    """Start a new symptom checker session."""
+    session_id = uuid.uuid4().hex[:16]
+    question_data = create_session(session_id)
+    return SymptomStartResponse(session_id=session_id, **question_data)
+
+
+@router.post("/answer")
+async def answer_symptom_question(answer: SymptomAnswerRequest):
+    """Answer the current symptom checker question."""
+    try:
+        result = answer_question(answer.session_id, answer.option_index)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+================================================================================
+FILE: backend/app/routers/admin.py
+================================================================================
+"""Admin panel routes."""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from typing import List
+
+from app.database import get_db
+from app.schemas.admin import AdminUserResponse, SystemMetrics
+from app.utils.dependencies import require_role
+from app.models.user import User, UserRole
+from app.models.conversation import Conversation, Message
+from app.models.appointment import Appointment
+from app.models.feedback import Feedback
+
+router = APIRouter()
+
+
+@router.get("/users", response_model=List[AdminUserResponse])
+async def list_users(
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all users in the system."""
+    result = await db.execute(select(User).order_by(User.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete a user (admin only)."""
+    if user_id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete yourself.")
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    await db.delete(user)
+    return {"message": f"User {user.email} deleted."}
+
+
+@router.get("/metrics", response_model=SystemMetrics)
+async def get_metrics(
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get system usage metrics."""
+    users_count = await db.scalar(select(func.count(User.id)))
+    convos_count = await db.scalar(select(func.count(Conversation.id)))
+    msgs_count = await db.scalar(select(func.count(Message.id)))
+    appts_count = await db.scalar(select(func.count(Appointment.id)))
+    feedbacks_count = await db.scalar(select(func.count(Feedback.id)))
+    avg_rating = await db.scalar(select(func.avg(Feedback.rating)))
+
+    return SystemMetrics(
+        total_users=users_count or 0,
+        total_conversations=convos_count or 0,
+        total_messages=msgs_count or 0,
+        total_appointments=appts_count or 0,
+        total_feedbacks=feedbacks_count or 0,
+        average_rating=round(float(avg_rating), 2) if avg_rating else None,
+    )
+
+
+================================================================================
+FILE: backend/app/routers/clinician.py
+================================================================================
+"""Clinician dashboard routes."""
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from typing import List
+
+from app.database import get_db
+from app.schemas.auth import UserResponse
+from app.schemas.chat import ConversationResponse, ConversationDetailResponse
+from app.schemas.admin import ClinicianNoteCreate, ClinicianNoteResponse
+from app.utils.dependencies import require_role
+from app.models.user import User, UserRole
+from app.models.conversation import Conversation, Message
+from app.models.clinician_note import ClinicianNote
+
+router = APIRouter()
+
+
+@router.get("/patients", response_model=List[UserResponse])
+async def list_patients(
+    current_user: User = Depends(require_role(UserRole.CLINICIAN, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all patient users."""
+    result = await db.execute(
+        select(User).where(User.role == UserRole.PATIENT).order_by(User.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.get("/patients/{patient_id}/conversations", response_model=List[ConversationResponse])
+async def get_patient_conversations(
+    patient_id: int,
+    current_user: User = Depends(require_role(UserRole.CLINICIAN, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all conversations for a specific patient."""
+    result = await db.execute(
+        select(Conversation)
+        .where(Conversation.user_id == patient_id)
+        .order_by(Conversation.updated_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
+async def get_conversation_detail(
+    conversation_id: int,
+    current_user: User = Depends(require_role(UserRole.CLINICIAN, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get full conversation transcript."""
+    result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found.")
+
+    msg_result = await db.execute(
+        select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at)
+    )
+    conv.messages = msg_result.scalars().all()
+    return conv
+
+
+@router.post("/notes", response_model=ClinicianNoteResponse, status_code=status.HTTP_201_CREATED)
+async def add_note(
+    data: ClinicianNoteCreate,
+    current_user: User = Depends(require_role(UserRole.CLINICIAN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Add a clinician note for a patient."""
+    note = ClinicianNote(clinician_id=current_user.id, **data.model_dump())
+    db.add(note)
+    await db.flush()
+    await db.refresh(note)
+    return note
+
+
+@router.get("/notes/{patient_id}", response_model=List[ClinicianNoteResponse])
+async def get_patient_notes(
+    patient_id: int,
+    current_user: User = Depends(require_role(UserRole.CLINICIAN, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get all notes for a patient."""
+    result = await db.execute(
+        select(ClinicianNote)
+        .where(ClinicianNote.patient_id == patient_id)
+        .order_by(ClinicianNote.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+================================================================================
+FILE: backend/app/services/auth_service.py
+================================================================================
+"""Authentication service — password hashing and user operations."""
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from passlib.context import CryptContext
+
+from app.models.user import User
+from app.schemas.auth import UserRegister
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
+    result = await db.execute(select(User).where(User.email == email))
+    return result.scalar_one_or_none()
+
+
+async def create_user(db: AsyncSession, user_data: UserRegister) -> User:
+    user = User(
+        email=user_data.email,
+        full_name=user_data.full_name,
+        password_hash=hash_password(user_data.password),
+        role=user_data.role,
+    )
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+================================================================================
+FILE: backend/app/services/chat_service.py
+================================================================================
+"""Chat service — manages conversations and message persistence."""
+
+import json
+from typing import List, Dict, Optional, AsyncGenerator
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+import asyncio
+
+from app.models.conversation import Conversation, Message
+
+
+async def get_or_create_conversation(
+    db: AsyncSession, session_id: str, conversation_id: Optional[int] = None
+) -> Conversation:
+    """Get existing conversation or create a new one."""
+    if conversation_id:
+        result = await db.execute(
+            select(Conversation).where(
+                Conversation.id == conversation_id,
+                Conversation.session_id == session_id,
+            )
+        )
+        conv = result.scalar_one_or_none()
+        if conv:
+            return conv
+
+    # Create new conversation
+    conv = Conversation(session_id=session_id, title="New Conversation")
+    db.add(conv)
+    await db.flush()
+    await db.refresh(conv)
+    return conv
+
+
+async def save_message(
+    db: AsyncSession,
+    conversation_id: int,
+    role: str,
+    content: str,
+    intent: Optional[str] = None,
+    entities: Optional[List[Dict]] = None,
+    is_emergency: bool = False,
+) -> Message:
+    """Save a message to the database."""
+    msg = Message(
+        conversation_id=conversation_id,
+        role=role,
+        content=content,
+        intent=intent,
+        entities=json.dumps(entities) if entities else None,
+        is_emergency=is_emergency,
+    )
+    db.add(msg)
+    await db.flush()
+    await db.refresh(msg)
+    return msg
+
+
+async def get_conversation_context(
+    db: AsyncSession, conversation_id: int, limit: int = 10
+) -> List[Dict]:
+    """Get recent messages for context."""
+    result = await db.execute(
+        select(Message)
+        .where(Message.conversation_id == conversation_id)
+        .order_by(Message.created_at.desc())
+        .limit(limit)
+    )
+    messages = result.scalars().all()
+    return [
+        {"role": m.role, "content": m.content}
+        for m in reversed(messages)
+    ]
+
+
+async def update_conversation_title(
+    db: AsyncSession, conversation: Conversation, first_message: str
+):
+    """Update conversation title based on first message."""
+    title = first_message[:50] + ("..." if len(first_message) > 50 else "")
+    conversation.title = title
+    await db.flush()
+
+
+async def stream_response(response_text: str) -> AsyncGenerator[str, None]:
+    """Stream response text token-by-token as SSE events."""
+    words = response_text.split(" ")
+    for i, word in enumerate(words):
+        token = word + (" " if i < len(words) - 1 else "")
+        yield f"data: {json.dumps({'token': token})}\n\n"
+        await asyncio.sleep(0.03)
+    yield f"data: {json.dumps({'done': True})}\n\n"
+
+
+async def get_user_conversations(db: AsyncSession, session_id: str) -> List[Conversation]:
+    """Get all conversations for a session."""
+    result = await db.execute(
+        select(Conversation)
+        .where(Conversation.session_id == session_id)
+        .order_by(Conversation.updated_at.desc())
+    )
+    return result.scalars().all()
+
+
+async def get_conversation_messages(
+    db: AsyncSession, conversation_id: int, session_id: str
+) -> Optional[Conversation]:
+    """Get a conversation with all its messages."""
+    result = await db.execute(
+        select(Conversation)
+        .where(
+            Conversation.id == conversation_id,
+            Conversation.session_id == session_id,
+        )
+    )
+    conv = result.scalar_one_or_none()
+    if conv:
+        msg_result = await db.execute(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at)
+        )
+        conv.messages = msg_result.scalars().all()
+    return conv
+
+
+================================================================================
+FILE: backend/app/services/gemini_service.py  (NOTE: uses NVIDIA API, not Gemini)
+================================================================================
+"""NVIDIA AI service for healthcare chatbot responses."""
+
+from openai import OpenAI
+from typing import List, Dict
+import asyncio
+import logging
+
+from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+SYSTEM_PROMPT = """You are HealthBot, a compassionate and knowledgeable AI healthcare assistant.
+Your goal is to provide helpful health information without causing stress or anxiety.
+
+⚠️ **CRITICAL SCOPE RULE — MEDICAL & HEALTH TOPICS ONLY** ⚠️
+You MUST ONLY respond to questions about:
+- Medical symptoms, conditions, and diseases
+- Wellness, fitness, nutrition, and healthy lifestyle
+- Mental health, stress management, and emotional wellbeing
+- First aid, medications (general info only), and preventive care
+- Medical terminology and health education
+
+If the user asks about ANYTHING unrelated to health or medicine — including but not limited to coding, programming, mathematics, recipes, politics, sports scores, entertainment, history, travel, finance, technology, creative writing, or any other non-medical topic — you MUST respond ONLY with:
+"I appreciate your question! 😊 However, I'm **HealthBot** — a medical and health assistant. I can only help with health-related topics like symptoms, wellness, nutrition, mental health, and medical questions. Please ask me something about your health, and I'll be happy to help! 🌿"
+
+Do NOT answer non-medical questions under any circumstances, even if the user insists.
+
+**Guidelines for Health Responses:**
+1.  **Be Calm & Reassuring**: Start with a warm, empathetic tone. Validate the user's feelings.
+2.  **Bite-Sized Information**: Break complex info into short, clear paragraphs.
+3.  **Structure is Key**:
+    -   Use **bold** for key takeaways.
+    -   Use bullet points for lists (symptoms, tips, steps).
+    -   Use clear headings for longer responses.
+4.  **Positive Framing**: Focus on actionable steps and solutions.
+5.  **Medical Disclaimer**: Gently remind users to consult a doctor for serious issues, naturally woven into the response.
+
+**Formatting:**
+-   Keep sentences concise and easy to read.
+-   Use emojis sparingly to add warmth (e.g., 🌿, 💙, ✨, 🩺).
+-   Never use alarmist language.
+
+**Scope**: General health, wellness, symptoms, nutrition, mental health. NO diagnosis, NO prescriptions.
+"""
+
+
+class AIService:
+    """Wrapper around NVIDIA API for healthcare chat."""
+
+    def __init__(self):
+        self._client = None
+
+    def initialize(self):
+        """Initialize the NVIDIA OpenAI-compatible client."""
+        if not settings.NVIDIA_API_KEY:
+            raise ValueError("NVIDIA_API_KEY is not set in environment variables")
+        self._client = OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=settings.NVIDIA_API_KEY,
+        )
+        logger.info("NVIDIA AI service initialized successfully")
+
+    async def generate_response(
+        self, message: str, context: List[Dict[str, str]] = None
+    ) -> str:
+        """Generate a response using NVIDIA API with conversation context."""
+        if not self._client:
+            self.initialize()
+
+        # Build messages list
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+        if context:
+            for msg in context[:-1]:  # Exclude current (already added below)
+                role = "user" if msg["role"] == "user" else "assistant"
+                messages.append({"role": role, "content": msg["content"]})
+
+        messages.append({"role": "user", "content": message})
+
+        # Run in thread to not block event loop
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = await asyncio.to_thread(
+                    self._client.chat.completions.create,
+                    model="meta/llama-3.1-70b-instruct",
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=1024,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                error_str = str(e)
+                if ("429" in error_str or "rate" in error_str.lower()) and attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 5
+                    logger.warning(f"NVIDIA rate limited (attempt {attempt+1}), retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"NVIDIA API error: {type(e).__name__}: {e}")
+                    raise
+
+
+# Singleton
+gemini_service = AIService()
+
+
+================================================================================
+FILE: backend/app/services/emergency_detector.py
+================================================================================
+"""Emergency keyword detection layer."""
+
+import re
+from typing import Tuple, Optional
+
+# Emergency keywords and phrases that trigger immediate escalation
+EMERGENCY_KEYWORDS = [
+    "chest pain",
+    "heart attack",
+    "suicide",
+    "suicidal",
+    "kill myself",
+    "want to die",
+    "end my life",
+    "overdose",
+    "drug overdose",
+    "severe bleeding",
+    "heavy bleeding",
+    "can't breathe",
+    "cannot breathe",
+    "difficulty breathing",
+    "choking",
+    "stroke",
+    "seizure",
+    "unconscious",
+    "passed out",
+    "anaphylaxis",
+    "allergic reaction severe",
+    "poisoning",
+    "self harm",
+    "self-harm",
+]
+
+EMERGENCY_RESPONSE = (
+    "🚨 **EMERGENCY DETECTED** 🚨\n\n"
+    "Based on what you've described, this may be a medical emergency. "
+    "Please take the following steps immediately:\n\n"
+    "1. **Call Emergency Services**: Dial 911 (US), 999 (UK), or 112 (EU) immediately.\n"
+    "2. **If someone is with you**, ask them to help or call for assistance.\n"
+    "3. **Do not delay** — seek professional medical help right away.\n\n"
+    "**Crisis Helplines:**\n"
+    "- Suicide Prevention: 988 (US) / 116 123 (UK)\n"
+    "- Poison Control: 1-800-222-1222 (US)\n\n"
+    "⚠️ *This chatbot is not a substitute for professional medical care. "
+    "In any life-threatening situation, please contact emergency services immediately.*"
+)
+
+
+def detect_emergency(text: str) -> Tuple[bool, Optional[str]]:
+    """
+    Scan input text for emergency keywords.
+
+    Returns:
+        (is_emergency, matched_keyword)
+    """
+    text_lower = text.lower().strip()
+    for keyword in EMERGENCY_KEYWORDS:
+        if keyword in text_lower:
+            return True, keyword
+    return False, None
+
+
+================================================================================
+FILE: backend/app/services/nlp_pipeline.py
+================================================================================
+"""NLP Pipeline — orchestrates preprocessing, NER, intent classification."""
+
+import asyncio
+import json
+from typing import Dict, Any, List
+
+from app.services.emergency_detector import detect_emergency, EMERGENCY_RESPONSE
+from app.services.entity_extractor import extract_entities, _get_nlp
+from app.services.intent_classifier import classify_intent, get_response_for_intent, load_model
+
+
+class NLPPipeline:
+    """Full NLP pipeline: preprocessing → emergency check → NER → intent → response."""
+
+    def __init__(self):
+        self._initialized = False
+
+    async def initialize(self):
+        """Load models and resources (runs CPU-bound work in thread pool)."""
+        if self._initialized:
+            return
+        # Run synchronous model loading in thread pool to avoid blocking event loop
+        await asyncio.to_thread(load_model)
+        await asyncio.to_thread(_get_nlp)  # Pre-load spaCy model
+        self._initialized = True
+
+    async def process(self, text: str, context: List[Dict] = None) -> Dict[str, Any]:
+        """
+        Process user input through the full NLP pipeline.
+
+        Returns dict with: response, intent, confidence, entities, is_emergency
+        """
+        # Step 1: Emergency detection (BEFORE anything else)
+        is_emergency, matched_keyword = detect_emergency(text)
+        if is_emergency:
+            return {
+                "response": EMERGENCY_RESPONSE,
+                "intent": "emergency",
+                "confidence": 1.0,
+                "entities": [{"text": matched_keyword, "label": "EMERGENCY"}],
+                "is_emergency": True,
+            }
+
+        # Step 2: Entity extraction
+        entities = extract_entities(text)
+
+        # Step 3: Intent classification
+        intent, confidence = classify_intent(text)
+
+        # Step 4: Generate response
+        response = get_response_for_intent(intent)
+
+        # Step 5: Enhance response with context and entities
+        if entities and intent == "symptom_query":
+            symptom_names = [e["text"] for e in entities if e["label"] in ("SYMPTOMS", "CONDITIONS")]
+            if symptom_names:
+                response += f"\n\n📋 **Detected symptoms/conditions**: {', '.join(symptom_names)}"
+
+        return {
+            "response": response,
+            "intent": intent,
+            "confidence": confidence,
+            "entities": entities,
+            "is_emergency": False,
+        }
+
+
+================================================================================
+FILE: backend/app/services/intent_classifier.py
+================================================================================
+"""Intent classification using TF-IDF + Logistic Regression."""
+
+import json
+import os
+import re
+from typing import Tuple, Optional
+
+import joblib
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+
+# Path to intents training data
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
+MODEL_PATH = os.path.join(DATA_DIR, "intent_model.joblib")
+INTENTS_PATH = os.path.join(DATA_DIR, "intents.json")
+
+_model: Optional[Pipeline] = None
+_intent_responses: dict = {}
+
+
+def _preprocess(text: str) -> str:
+    """Basic text preprocessing."""
+    text = text.lower().strip()
+    text = re.sub(r'[^\w\s]', '', text)
+    return text
+
+
+def train_model():
+    """Train intent classifier from intents.json."""
+    global _model, _intent_responses
+
+    with open(INTENTS_PATH, 'r', encoding='utf-8') as f:
+        intents_data = json.load(f)
+
+    texts = []
+    labels = []
+    _intent_responses = {}
+
+    for intent in intents_data["intents"]:
+        tag = intent["tag"]
+        _intent_responses[tag] = intent["responses"]
+        for pattern in intent["patterns"]:
+            texts.append(_preprocess(pattern))
+            labels.append(tag)
+
+    _model = Pipeline([
+        ('tfidf', TfidfVectorizer(ngram_range=(1, 2), max_features=5000)),
+        ('clf', LogisticRegression(max_iter=1000, C=10, random_state=42)),
+    ])
+    _model.fit(texts, labels)
+
+    # Save model
+    os.makedirs(DATA_DIR, exist_ok=True)
+    joblib.dump((_model, _intent_responses), MODEL_PATH)
+
+
+def load_model():
+    """Load a previously trained model."""
+    global _model, _intent_responses
+    if os.path.exists(MODEL_PATH):
+        _model, _intent_responses = joblib.load(MODEL_PATH)
+    else:
+        train_model()
+
+
+def classify_intent(text: str) -> Tuple[str, float]:
+    """
+    Classify the intent of user input.
+
+    Returns:
+        (intent_tag, confidence_score)
+    """
+    global _model
+    if _model is None:
+        load_model()
+
+    processed = _preprocess(text)
+    intent = _model.predict([processed])[0]
+    probabilities = _model.predict_proba([processed])[0]
+    confidence = max(probabilities)
+
+    return intent, float(confidence)
+
+
+def get_response_for_intent(intent: str) -> str:
+    """Get a random response template for the given intent."""
+    import random
+    global _intent_responses
+    if intent in _intent_responses:
+        return random.choice(_intent_responses[intent])
+    return "I'm not sure I understand. Could you rephrase your question?"
+
+
+================================================================================
+FILE: backend/app/services/entity_extractor.py
+================================================================================
+"""spaCy-based Named Entity Recognition for medical entities."""
+
+from typing import List, Dict
+
+# Lazy-load spaCy to avoid import-time overhead
+_nlp = None
+
+
+def _get_nlp():
+    global _nlp
+    if _nlp is None:
+        try:
+            import spacy
+            _nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            import spacy
+            from spacy.cli import download
+            download("en_core_web_sm")
+            _nlp = spacy.load("en_core_web_sm")
+    return _nlp
+
+
+# Custom medical entity patterns
+MEDICAL_KEYWORDS = {
+    "symptoms": [
+        "headache", "fever", "cough", "fatigue", "nausea", "vomiting",
+        "dizziness", "chest pain", "shortness of breath", "sore throat",
+        "runny nose", "body aches", "chills", "diarrhea", "constipation",
+        "rash", "swelling", "numbness", "tingling", "blurred vision",
+        "back pain", "joint pain", "muscle pain", "stomach ache",
+        "insomnia", "anxiety", "depression", "weight loss", "weight gain",
+        "palpitations", "sweating", "itching", "bruising", "bleeding",
+    ],
+    "body_parts": [
+        "head", "chest", "stomach", "back", "neck", "shoulder",
+        "arm", "leg", "knee", "ankle", "wrist", "hand", "foot",
+        "throat", "eye", "ear", "nose", "heart", "lung", "liver",
+        "kidney", "skin", "spine", "hip", "elbow",
+    ],
+    "conditions": [
+        "diabetes", "hypertension", "asthma", "cold", "flu",
+        "allergy", "infection", "migraine", "arthritis", "bronchitis",
+        "pneumonia", "covid", "eczema", "sinusitis",
+    ],
+}
+
+
+def extract_entities(text: str) -> List[Dict[str, str]]:
+    """
+    Extract named entities from text using spaCy + custom medical lexicon.
+
+    Returns list of dicts with 'text', 'label', 'start', 'end'.
+    """
+    nlp = _get_nlp()
+    doc = nlp(text)
+    entities = []
+
+    # spaCy NER entities
+    for ent in doc.ents:
+        entities.append({
+            "text": ent.text,
+            "label": ent.label_,
+            "start": ent.start_char,
+            "end": ent.end_char,
+        })
+
+    # Custom medical entity matching
+    text_lower = text.lower()
+    for category, keywords in MEDICAL_KEYWORDS.items():
+        for keyword in keywords:
+            if keyword in text_lower:
+                start = text_lower.index(keyword)
+                entities.append({
+                    "text": keyword,
+                    "label": category.upper(),
+                    "start": start,
+                    "end": start + len(keyword),
+                })
+
+    # Deduplicate
+    seen = set()
+    unique_entities = []
+    for ent in entities:
+        key = (ent["text"].lower(), ent["label"])
+        if key not in seen:
+            seen.add(key)
+            unique_entities.append(ent)
+
+    return unique_entities
+
+
+================================================================================
+FILE: backend/app/services/encryption.py
+================================================================================
+"""AES-256-GCM encryption service for sensitive data."""
+
+import os
+import base64
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from app.config import settings
+
+
+class EncryptionService:
+    """Encrypt and decrypt sensitive data using AES-256-GCM."""
+
+    def __init__(self):
+        key_hex = settings.AES_ENCRYPTION_KEY
+        # Ensure 32 bytes (256 bits)
+        self.key = bytes.fromhex(key_hex.ljust(64, '0')[:64])
+
+    def encrypt(self, plaintext: str) -> str:
+        """Encrypt a string and return base64-encoded ciphertext."""
+        nonce = os.urandom(12)
+        aesgcm = AESGCM(self.key)
+        ciphertext = aesgcm.encrypt(nonce, plaintext.encode('utf-8'), None)
+        # Prepend nonce to ciphertext
+        encrypted = nonce + ciphertext
+        return base64.b64encode(encrypted).decode('utf-8')
+
+    def decrypt(self, encrypted_data: str) -> str:
+        """Decrypt a base64-encoded ciphertext string."""
+        raw = base64.b64decode(encrypted_data)
+        nonce = raw[:12]
+        ciphertext = raw[12:]
+        aesgcm = AESGCM(self.key)
+        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        return plaintext.decode('utf-8')
+
+
+encryption_service = EncryptionService()
+
+
+================================================================================
+FILE: backend/app/services/symptom_checker.py
+================================================================================
+"""Symptom Checker — decision-tree-based symptom triage system."""
+
+import json
+import os
+from typing import Dict, Any, Optional, List
+
+DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
+SYMPTOM_TREE_PATH = os.path.join(DATA_DIR, "symptom_tree.json")
+
+_symptom_tree: Optional[Dict] = None
+
+
+def _load_tree():
+    global _symptom_tree
+    if _symptom_tree is None:
+        with open(SYMPTOM_TREE_PATH, 'r', encoding='utf-8') as f:
+            _symptom_tree = json.load(f)
+    return _symptom_tree
+
+
+class SymptomCheckerSession:
+    """Manages a single symptom checker session with branching logic."""
+
+    def __init__(self):
+        self.tree = _load_tree()
+        self.current_node_id = "root"
+        self.answers: List[Dict] = []
+        self.scores: Dict[str, float] = {}
+
+    def get_current_question(self) -> Dict[str, Any]:
+        """Get the current question and options."""
+        node = self.tree["nodes"][self.current_node_id]
+        return {
+            "node_id": self.current_node_id,
+            "question": node["question"],
+            "options": node.get("options", []),
+            "category": node.get("category", "general"),
+            "is_final": node.get("is_final", False),
+        }
+
+    def answer(self, option_index: int) -> Dict[str, Any]:
+        """Process an answer and advance to the next node."""
+        node = self.tree["nodes"][self.current_node_id]
+        options = node.get("options", [])
+
+        if option_index < 0 or option_index >= len(options):
+            raise ValueError("Invalid option index")
+
+        selected = options[option_index]
+        self.answers.append({
+            "question": node["question"],
+            "answer": selected["text"],
+            "node_id": self.current_node_id,
+        })
+
+        # Accumulate scores for conditions
+        if "scores" in selected:
+            for condition, score in selected["scores"].items():
+                self.scores[condition] = self.scores.get(condition, 0) + score
+
+        # Move to next node
+        next_node_id = selected.get("next")
+        if next_node_id is None or next_node_id not in self.tree["nodes"]:
+            return self._generate_result()
+
+        self.current_node_id = next_node_id
+        next_node = self.tree["nodes"][self.current_node_id]
+
+        if next_node.get("is_final", False):
+            return self._generate_result()
+
+        return self.get_current_question()
+
+    def _generate_result(self) -> Dict[str, Any]:
+        """Generate final result based on accumulated scores."""
+        if not self.scores:
+            return {
+                "is_final": True,
+                "result": {
+                    "conditions": [],
+                    "recommendation": "Based on your responses, no specific conditions were strongly indicated. If symptoms persist, please consult a healthcare professional.",
+                    "urgency": "low",
+                    "disclaimer": "⚠️ This assessment is for informational purposes only and does not constitute medical advice. Always consult a qualified healthcare provider for proper diagnosis and treatment.",
+                },
+            }
+
+        # Sort conditions by score
+        sorted_conditions = sorted(self.scores.items(), key=lambda x: x[1], reverse=True)
+        total_score = sum(s for _, s in sorted_conditions)
+
+        conditions = []
+        for condition, score in sorted_conditions[:3]:
+            probability = round((score / total_score) * 100, 1) if total_score > 0 else 0
+            condition_info = self.tree.get("conditions", {}).get(condition, {})
+            conditions.append({
+                "name": condition,
+                "probability": probability,
+                "description": condition_info.get("description", ""),
+                "recommendation": condition_info.get("recommendation", "Consult a healthcare professional."),
+            })
+
+        # Determine urgency
+        max_score = sorted_conditions[0][1] if sorted_conditions else 0
+        urgency = "high" if max_score > 5 else "medium" if max_score > 3 else "low"
+
+        return {
+            "is_final": True,
+            "result": {
+                "conditions": conditions,
+                "recommendation": f"Based on your symptoms, the most likely condition may be {sorted_conditions[0][0]}. Please consult a healthcare professional for a proper diagnosis.",
+                "urgency": urgency,
+                "disclaimer": "⚠️ This assessment is for informational purposes only and does not constitute medical advice. Always consult a qualified healthcare provider for proper diagnosis and treatment.",
+            },
+        }
+
+
+# In-memory session store (in production, use Redis)
+_sessions: Dict[str, SymptomCheckerSession] = {}
+
+
+def create_session(session_id: str) -> Dict[str, Any]:
+    """Start a new symptom checker session."""
+    _load_tree()
+    session = SymptomCheckerSession()
+    _sessions[session_id] = session
+    return session.get_current_question()
+
+
+def answer_question(session_id: str, option_index: int) -> Dict[str, Any]:
+    """Answer the current question in an existing session."""
+    if session_id not in _sessions:
+        raise ValueError("Session not found. Please start a new session.")
+    session = _sessions[session_id]
+    result = session.answer(option_index)
+    if result.get("is_final"):
+        del _sessions[session_id]  # Clean up completed session
+    return result
+
+
+================================================================================
+FILE: backend/app/utils/jwt_handler.py
+================================================================================
+"""JWT token creation and verification."""
+
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Dict
+from jose import JWTError, jwt
+from app.config import settings
+
+
+def create_access_token(data: Dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a JWT access token."""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire, "type": "access"})
+    return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def create_refresh_token(data: Dict) -> str:
+    """Create a JWT refresh token."""
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def verify_token(token: str) -> Optional[Dict]:
+    """Verify and decode a JWT token."""
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        return payload
+    except JWTError:
+        return None
+
+
+================================================================================
+FILE: backend/app/utils/dependencies.py
+================================================================================
+"""FastAPI dependency injection utilities."""
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.database import get_db
+from app.utils.jwt_handler import verify_token
+from app.models.user import User, UserRole
+
+security = HTTPBearer()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Extract and validate the current user from JWT token."""
+    token = credentials.credentials
+    payload = verify_token(token)
+
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    user = result.scalar_one_or_none()
+
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+
+    return user
+
+
+def require_role(*roles: UserRole):
+    """Dependency factory: require user to have one of the specified roles."""
+    async def role_checker(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required roles: {[r.value for r in roles]}",
+            )
+        return current_user
+    return role_checker
+
+
+async def require_consent(current_user: User = Depends(get_current_user)) -> User:
+    """Ensure user has accepted the medical disclaimer before using chat."""
+    if not current_user.has_consented:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You must accept the medical disclaimer before using the chat.",
+        )
+    return current_user
+
+
+================================================================================
+FILE: backend/app/middleware/security_headers.py
+================================================================================
+"""Security headers middleware."""
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers to all responses."""
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        return response
+
+
+================================================================================
+FILE: backend/app/middleware/rate_limiter.py
+================================================================================
+"""Redis-based token bucket rate limiter middleware."""
+
+import time
+import asyncio
+from typing import Optional
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+
+try:
+    import redis.asyncio as aioredis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+
+from app.config import settings
+
+
+class RateLimiterMiddleware(BaseHTTPMiddleware):
+    """Token bucket rate limiter using Redis."""
+
+    def __init__(self, app, requests_per_minute: int = 60):
+        super().__init__(app)
+        self.requests_per_minute = requests_per_minute
+        self.redis_client: Optional[object] = None
+        self._initialized = False
+
+    async def _init_redis(self):
+        if self._initialized:
+            return
+        self._initialized = True
+        if REDIS_AVAILABLE:
+            try:
+                self.redis_client = aioredis.from_url(
+                    settings.REDIS_URL,
+                    decode_responses=True,
+                    socket_connect_timeout=2,
+                )
+                await self.redis_client.ping()
+            except Exception:
+                self.redis_client = None
+
+    async def dispatch(self, request: Request, call_next):
+        await self._init_redis()
+
+        # Skip rate limiting if Redis is not available
+        if self.redis_client is None:
+            return await call_next(request)
+
+        # Use IP + path as rate limit key
+        client_ip = request.client.host if request.client else "unknown"
+        key = f"rate_limit:{client_ip}:{request.url.path}"
+
+        try:
+            # Token bucket: check current count
+            current = await self.redis_client.get(key)
+            if current is not None and int(current) >= self.requests_per_minute:
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Rate limit exceeded. Please try again later."},
+                )
+
+            # Increment counter with TTL
+            pipe = self.redis_client.pipeline()
+            pipe.incr(key)
+            pipe.expire(key, 60)
+            await pipe.execute()
+        except Exception:
+            # Fail open — don't block requests if Redis has issues
+            pass
+
+        return await call_next(request)
+
+
+================================================================================
+FILE: backend/data/intents.json
+================================================================================
+{
+  "intents": [
+    {
+      "tag": "greeting",
+      "patterns": ["hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+        "hi there", "hello there", "hey there", "greetings", "howdy",
+        "what's up", "how are you", "nice to meet you"],
+      "responses": [
+        "Hello! I'm your healthcare assistant. How can I help you today?",
+        "Hi there! I'm here to help with your health questions. What would you like to know?",
+        "Welcome! I can help with symptoms, appointments, medications, and general health information. How can I assist you?"
+      ]
+    },
+    {
+      "tag": "farewell",
+      "patterns": ["bye", "goodbye", "see you", "take care", "good night",
+        "later", "see you later", "bye bye", "have a nice day",
+        "thanks goodbye", "thanks bye", "that's all"],
+      "responses": [
+        "Goodbye! Take care and stay healthy! 🌟",
+        "See you later! Remember, I'm here whenever you need health guidance.",
+        "Bye! Don't hesitate to come back if you have any health questions."
+      ]
+    },
+    {
+      "tag": "symptom_query",
+      "patterns": ["I have a headache", "my head hurts", "I feel dizzy",
+        "I have a fever", "I'm feeling sick", "I have a cough",
+        "my stomach hurts", "I have body aches", "I feel nauseous",
+        "what are the symptoms of", "what could be wrong with me",
+        "why do I feel", "I have been experiencing"],
+      "responses": [
+        "I understand you're experiencing some symptoms. Let me analyze what you've described. Based on your symptoms, I recommend consulting a healthcare professional for a proper diagnosis.",
+        "Thank you for sharing your symptoms. While I can provide general guidance, it's important to see a doctor for accurate diagnosis.",
+        "I hear you. Health concerns can be worrying. Let me help you understand your symptoms better."
+      ]
+    },
+    {
+      "tag": "general_health",
+      "patterns": ["health tips", "how to stay healthy", "wellness advice",
+        "nutrition tips", "exercise advice", "diet recommendations",
+        "how to improve health", "healthy lifestyle"],
+      "responses": [
+        "Great question about health! Here are some general tips:\n\n• Stay hydrated (8 glasses of water daily)\n• Get 7-9 hours of sleep\n• Exercise regularly (150 min/week)\n• Eat a balanced diet rich in fruits and vegetables\n• Manage stress through relaxation techniques",
+        "Maintaining good health involves several key habits:\n\n• Regular physical activity\n• Balanced nutrition\n• Adequate sleep\n• Stress management\n• Regular health checkups"
+      ]
+    },
+    {
+      "tag": "mental_health",
+      "patterns": ["I'm feeling stressed", "I have anxiety", "I feel depressed",
+        "mental health help", "I'm not doing well mentally",
+        "I can't cope", "feeling overwhelmed", "I need emotional support"],
+      "responses": [
+        "I appreciate you sharing this with me. Mental health is just as important as physical health.\n\n⚠️ If you're in crisis, please contact the 988 Suicide & Crisis Lifeline by calling or texting 988.",
+        "Your mental wellbeing matters greatly. Please consider reaching out to a mental health professional."
+      ]
+    }
+  ]
+}
+
+
+================================================================================
+FILE: frontend/index.html
+================================================================================
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description"
+    content="AI-Powered Healthcare Chatbot — Get instant health guidance, manage appointments, and track medications." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+  <title>HealthBot — AI Healthcare Assistant</title>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>
+
+
+================================================================================
+FILE: frontend/package.json
+================================================================================
+{
+    "name": "healthcare-chatbot-frontend",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview",
+        "test": "jest"
+    },
+    "dependencies": {
+        "axios": "^1.7.7",
+        "framer-motion": "^11.5.4",
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-icons": "^5.3.0",
+        "react-markdown": "^10.1.0",
+        "react-router-dom": "^6.26.2",
+        "remark-gfm": "^4.0.1"
+    },
+    "devDependencies": {
+        "@types/react": "^18.3.5",
+        "@types/react-dom": "^18.3.0",
+        "@vitejs/plugin-react": "^4.3.1",
+        "autoprefixer": "^10.4.20",
+        "postcss": "^8.4.45",
+        "tailwindcss": "^3.4.11",
+        "typescript": "^5.5.4",
+        "vite": "^5.4.6"
+    }
+}
+
+
+================================================================================
+FILE: frontend/src/main.tsx
+================================================================================
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+        <App />
+    </React.StrictMode>
+);
+
+
+================================================================================
+FILE: frontend/src/api/client.ts
+================================================================================
+import axios from 'axios';
+
+const api = axios.create({
+    baseURL: import.meta.env.VITE_API_URL || '/api',
+    headers: { 'Content-Type': 'application/json' },
+    withCredentials: true,
+});
+
+export default api;
+
+
+================================================================================
+FILE: frontend/src/types/index.ts
+================================================================================
+export interface User {
+    id: number;
+    email: string;
+    full_name: string;
+    role: 'PATIENT' | 'CLINICIAN' | 'ADMIN';
+    has_consented: boolean;
+    is_active: boolean;
+}
+
+export interface TokenResponse {
+    access_token: string;
+    refresh_token: string;
+    token_type: string;
+}
+
+export interface ChatMessage {
+    id: number;
+    role: 'user' | 'assistant';
+    content: string;
+    intent?: string;
+    entities?: string;
+    is_emergency: boolean;
+    created_at: string;
+}
+
+export interface Conversation {
+    id: number;
+    title: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+    message_count?: number;
+    messages?: ChatMessage[];
+}
+
+export interface Appointment {
+    id: number;
+    title: string;
+    doctor_name?: string;
+    location?: string;
+    notes?: string;
+    scheduled_at: string;
+    created_at: string;
+}
+
+export interface Medication {
+    id: number;
+    medication_name: string;
+    dosage: string;
+    frequency: string;
+    time_of_day?: string;
+    notes?: string;
+    start_date: string;
+    end_date?: string;
+    created_at: string;
+}
+
+export interface Feedback {
+    id: number;
+    user_id: number;
+    message_id?: number;
+    rating: number;
+    comment?: string;
+    created_at: string;
+}
+
+export interface SymptomQuestion {
+    session_id?: string;
+    node_id: string;
+    question: string;
+    options: { text: string }[];
+    category: string;
+    is_final: boolean;
+}
+
+export interface SymptomResult {
+    is_final: true;
+    result: {
+        conditions: {
+            name: string;
+            probability: number;
+            description: string;
+            recommendation: string;
+        }[];
+        recommendation: string;
+        urgency: string;
+        disclaimer: string;
+    };
+}
+
+export interface SystemMetrics {
+    total_users: number;
+    total_conversations: number;
+    total_messages: number;
+    total_appointments: number;
+    total_feedbacks: number;
+    average_rating?: number;
+}
+
+export interface ClinicianNote {
+    id: number;
+    clinician_id: number;
+    patient_id: number;
+    conversation_id?: number;
+    content: string;
+    created_at: string;
+}
+
+
+================================================================================
+FILE: frontend/src/context/ThemeContext.tsx
+================================================================================
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+
+interface ThemeContextType {
+    isDark: boolean;
+    toggle: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextType>({ isDark: false, toggle: () => { } });
+
+export function ThemeProvider({ children }: { children: ReactNode }) {
+    const [isDark, setIsDark] = useState(() => {
+        return localStorage.getItem('theme') === 'dark';
+    });
+
+    useEffect(() => {
+        if (isDark) {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+        }
+    }, [isDark]);
+
+    const toggle = () => setIsDark(!isDark);
+
+    return (
+        <ThemeContext.Provider value={{ isDark, toggle }}>
+            {children}
+        </ThemeContext.Provider>
+    );
+}
+
+export function useTheme() {
+    return useContext(ThemeContext);
+}
+
+
+================================================================================
+FILE: frontend/src/hooks/useSSE.ts
+================================================================================
+import { useCallback, useRef, useState } from 'react';
+
+interface SSEOptions {
+    onToken: (token: string) => void;
+    onDone: () => void;
+    onError?: (error: string) => void;
+    onHeaders?: (headers: Headers) => void;
+}
+
+export function useSSE() {
+    const [isStreaming, setIsStreaming] = useState(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    const startStream = useCallback(async (
+        url: string,
+        body: object,
+        options: SSEOptions,
+    ) => {
+        setIsStreaming(true);
+        abortControllerRef.current = new AbortController();
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+                signal: abortControllerRef.current.signal,
+                credentials: 'include',
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.detail || `HTTP ${response.status}`);
+            }
+
+            // Pass headers to caller
+            if (options.onHeaders && response.headers) {
+                options.onHeaders(response.headers);
+            }
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+
+            if (!reader) throw new Error('No response body');
+
+            let buffer = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.done) {
+                                options.onDone();
+                            } else if (data.token) {
+                                options.onToken(data.token);
+                            }
+                        } catch {
+                            // Skip malformed JSON
+                        }
+                    }
+                }
+            }
+        } catch (err: any) {
+            if (err.name !== 'AbortError') {
+                options.onError?.(err.message || 'Streaming failed');
+            }
+        } finally {
+            setIsStreaming(false);
+            abortControllerRef.current = null;
+        }
+    }, []);
+
+    const abort = useCallback(() => {
+        abortControllerRef.current?.abort();
+        setIsStreaming(false);
+    }, []);
+
+    return { isStreaming, startStream, abort };
+}
+
+
+================================================================================
+FILE: frontend/src/App.tsx
+================================================================================
+import React, { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
+import api from './api/client';
+import { Conversation } from './types';
+
+import Sidebar from './components/Sidebar';
+import Navbar from './components/Navbar';
+import Chat from './pages/Chat';
+import SymptomChecker from './pages/SymptomChecker';
+import Dashboard from './pages/Dashboard';
+
+function AppContent() {
+    const navigate = useNavigate();
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [activeConvId, setActiveConvId] = useState<number | null>(null);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    const loadConversations = useCallback(async () => {
+        try {
+            const res = await api.get('/chat/conversations');
+            setConversations(res.data);
+        } catch { }
+    }, []);
+
+    useEffect(() => { loadConversations(); }, [loadConversations]);
+
+    const handleNewChat = () => {
+        setActiveConvId(null);
+        setSidebarOpen(false);
+        navigate('/');
+    };
+
+    const handleSelectConv = (id: number) => {
+        setActiveConvId(id);
+        setSidebarOpen(false);
+        navigate('/');
+    };
+
+    const handleDeleteConv = async (id: number) => {
+        try {
+            await api.delete(`/chat/conversations/${id}`);
+            setConversations(prev => prev.filter(c => c.id !== id));
+            if (activeConvId === id) setActiveConvId(null);
+        } catch { }
+    };
+
+    return (
+        <div className="h-screen flex flex-col bg-[#f0fdfa] dark:bg-[#0a0f1a]">
+            <Navbar
+                onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                onNewChat={handleNewChat}
+            />
+            <div className="flex flex-1 overflow-hidden relative">
+                <Sidebar
+                    conversations={conversations}
+                    activeId={activeConvId}
+                    onSelect={handleSelectConv}
+                    onDelete={handleDeleteConv}
+                    isOpen={sidebarOpen}
+                    onToggle={() => setSidebarOpen(false)}
+                />
+                <div className="flex-1 flex flex-col min-w-0">
+                    <Routes>
+                        <Route path="/" element={
+                            <Chat
+                                conversations={conversations}
+                                activeConvId={activeConvId}
+                                setActiveConvId={setActiveConvId}
+                                onConversationsChange={loadConversations}
+                            />
+                        } />
+                        <Route path="/symptoms" element={<SymptomChecker />} />
+                        <Route path="/dashboard" element={<Dashboard />} />
+                        <Route path="*" element={<Navigate to="/" />} />
+                    </Routes>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export default function App() {
+    return (
+        <BrowserRouter>
+            <ThemeProvider>
+                <AppContent />
+            </ThemeProvider>
+        </BrowserRouter>
+    );
+}
+
+
+================================================================================
+FILE: frontend/src/components/Navbar.tsx
+================================================================================
+import React from 'react';
+import { useTheme } from '../context/ThemeContext';
+import { motion, AnimatePresence } from 'framer-motion';
+
+interface Props {
+    onToggleSidebar: () => void;
+    onNewChat: () => void;
+}
+
+export default function Navbar({ onToggleSidebar, onNewChat }: Props) {
+    const { isDark, toggle } = useTheme();
+
+    return (
+        <nav className="h-14 flex items-center justify-between px-4 border-b bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-xl border-[#ccfbf1] dark:border-[rgba(20,184,166,0.1)] flex-shrink-0">
+            <button
+                onClick={onToggleSidebar}
+                className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa] dark:hover:bg-[#1a2332] transition-colors"
+            >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+
+            <div className="flex items-center gap-2">
+                <button onClick={onNewChat} className="btn-new-chat text-[13px] py-1.5 px-3.5 rounded-lg">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    New Chat
+                </button>
+
+                <motion.button
+                    whileTap={{ scale: 0.85 }}
+                    onClick={toggle}
+                    className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa] dark:hover:bg-[#1a2332] transition-colors"
+                    aria-label="Toggle dark mode"
+                >
+                    <AnimatePresence mode="wait" initial={false}>
+                        {isDark ? (
+                            <motion.svg key="sun" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}
+                                className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round"
+                                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </motion.svg>
+                        ) : (
+                            <motion.svg key="moon" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}
+                                className="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round"
+                                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                            </motion.svg>
+                        )}
+                    </AnimatePresence>
+                </motion.button>
+            </div>
+        </nav>
+    );
+}
+
+
+================================================================================
+FILE: frontend/src/components/ChatMessage.tsx
+================================================================================
+import React, { useMemo } from 'react';
+import { motion } from 'framer-motion';
+import { ChatMessage as ChatMessageType } from '../types';
+import ReactMarkdown from 'react-markdown';
+
+interface Props {
+    message: ChatMessageType;
+}
+
+function StaggeredMarkdown({ content }: { content: string }) {
+    const paragraphs = useMemo(() => content.split(/\n{2,}/).filter(p => p.trim()), [content]);
+    return (
+        <>
+            {paragraphs.map((p, i) => (
+                <motion.div key={i} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}>
+                    <ReactMarkdown>{p}</ReactMarkdown>
+                </motion.div>
+            ))}
+        </>
+    );
+}
+
+export default function ChatMessage({ message }: Props) {
+    const isUser = message.role === 'user';
+    const time = new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className={`flex gap-3 mb-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+        >
+            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isUser
+                ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white'
+                : 'bg-[#f0fdfa] dark:bg-[#1a2332] text-teal-500 ring-1 ring-[#ccfbf1] dark:ring-[rgba(20,184,166,0.2)]'
+                }`}>
+                {isUser ? 'U' : 'AI'}
+            </div>
+
+            <div className={`max-w-[65%] flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+                <div className={`text-[15px] leading-relaxed ${isUser
+                    ? 'bubble-user'
+                    : message.is_emergency
+                        ? 'bubble-ai emergency-bubble'
+                        : 'bubble-ai prose-custom'
+                    }`}>
+                    {isUser ? (
+                        <div className="whitespace-pre-wrap">{message.content}</div>
+                    ) : (
+                        <StaggeredMarkdown content={message.content} />
+                    )}
+                </div>
+                <span className="text-[10px] text-slate-400 dark:text-slate-600 mt-1 px-1">{time}</span>
+            </div>
+        </motion.div>
+    );
+}
+
+export function TypingIndicator() {
+    return (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 mb-4">
+            <div className="relative w-8 h-8 rounded-full bg-[#f0fdfa] dark:bg-[#1a2332] flex items-center justify-center text-xs font-bold text-teal-500 ring-1 ring-[#ccfbf1] dark:ring-[rgba(20,184,166,0.2)] avatar-pulse">
+                AI
+            </div>
+            <div className="bubble-ai">
+                <div className="flex items-center gap-1.5 h-5">
+                    <span className="typing-dot"></span>
+                    <span className="typing-dot"></span>
+                    <span className="typing-dot"></span>
+                </div>
+            </div>
+        </motion.div>
+    );
+}
+
+export function StreamingMessage({ content }: { content: string }) {
+    return (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 mb-4">
+            <div className="relative w-8 h-8 rounded-full bg-[#f0fdfa] dark:bg-[#1a2332] flex items-center justify-center text-xs font-bold text-teal-500 ring-1 ring-[#ccfbf1] dark:ring-[rgba(20,184,166,0.2)] avatar-pulse">
+                AI
+            </div>
+            <div className="max-w-[65%]">
+                <div className="bubble-ai prose-custom">
+                    <ReactMarkdown>{content}</ReactMarkdown>
+                    <span className="streaming-caret"></span>
+                </div>
+            </div>
+        </motion.div>
+    );
+}
+
+
+================================================================================
+FILE: frontend/src/components/ChatInput.tsx
+================================================================================
+import React, { useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
+
+interface Props {
+    onSend: (message: string) => void;
+    onAbort: () => void;
+    isStreaming: boolean;
+    disabled: boolean;
+}
+
+export default function ChatInput({ onSend, onAbort, isStreaming, disabled }: Props) {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const autoResize = () => {
+        const el = textareaRef.current;
+        if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 150) + 'px'; }
+    };
+
+    useEffect(() => { textareaRef.current?.focus(); }, []);
+
+    const handleSubmit = () => {
+        const val = textareaRef.current?.value.trim();
+        if (!val || disabled || isStreaming) return;
+        onSend(val);
+        if (textareaRef.current) { textareaRef.current.value = ''; textareaRef.current.style.height = 'auto'; }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
+    };
+
+    return (
+        <div className="p-4 max-w-3xl mx-auto w-full">
+            <div className="flex items-end gap-3 bg-white/80 dark:bg-[#1a2332]/80 backdrop-blur-xl rounded-2xl border border-[#ccfbf1] dark:border-[rgba(20,184,166,0.12)] px-4 py-2 focus-within:border-teal-400/60 focus-within:ring-1 focus-within:ring-teal-400/20 transition-all duration-200 shadow-sm">
+                <textarea
+                    ref={textareaRef}
+                    rows={1}
+                    placeholder="Ask me anything about health..."
+                    onInput={autoResize}
+                    onKeyDown={handleKeyDown}
+                    disabled={disabled}
+                    className="flex-1 bg-transparent text-[15px] text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 resize-none focus:outline-none py-2 max-h-[150px]"
+                />
+
+                {isStreaming ? (
+                    <motion.button
+                        whileTap={{ scale: 0.85 }}
+                        onClick={onAbort}
+                        className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-50 dark:bg-red-500/20 text-red-500 dark:text-red-400 flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-500/30 transition-colors"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </motion.button>
+                ) : (
+                    <motion.button
+                        whileTap={{ scale: 0.85 }}
+                        onClick={handleSubmit}
+                        className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-500 text-white flex items-center justify-center hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-200"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </motion.button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+
+================================================================================
+FILE: frontend/src/pages/Chat.tsx
+================================================================================
+(See full file content above — Chat.tsx with welcome screen, suggestions, streaming messages)
+
+
+================================================================================
+FILE: frontend/src/pages/Dashboard.tsx
+================================================================================
+(See full file content above — Dashboard.tsx with Appointments & Medications tabs/forms)
+
+
+================================================================================
+FILE: frontend/src/pages/SymptomChecker.tsx
+================================================================================
+(See full file content above — SymptomChecker.tsx with decision tree Q&A flow)
+
+
+================================================================================
+FILE: frontend/src/components/Sidebar.tsx
+================================================================================
+(See full file content above — Sidebar.tsx with navigation, history grouped by date)
+
+
+================================================================================
+ARCHITECTURE SUMMARY
+================================================================================
+Backend (FastAPI + Python):
+  - main.py: App entry, middleware, router registration
+  - config.py: Settings from environment variables
+  - database.py: SQLAlchemy async engine + session
+  - models/: SQLAlchemy ORM models (User, Conversation, Message, Appointment)
+  - schemas/: Pydantic request/response models
+  - routers/: HTTP endpoint handlers (auth, chat, appointments, medications, etc.)
+  - services/: Business logic (AI, NLP, symptom checker, encryption, auth)
+  - utils/: JWT handling, FastAPI dependencies
+  - middleware/: Security headers, rate limiting
+
+Frontend (React + TypeScript + Vite):
+  - App.tsx: Root component with routing
+  - pages/Chat.tsx: Main chat interface with SSE streaming
+  - pages/Dashboard.tsx: Appointments & Medications management
+  - pages/SymptomChecker.tsx: Decision-tree symptom assessment
+  - components/: Sidebar, Navbar, ChatMessage, ChatInput
+  - hooks/useSSE.ts: Server-Sent Events streaming hook
+  - context/ThemeContext.tsx: Dark/light mode
+  - api/client.ts: Axios API client
+  - types/index.ts: TypeScript interfaces
+
+Key Features:
+  - Real-time streaming AI responses via SSE
+  - Emergency keyword detection with immediate escalation
+  - NVIDIA LLaMA-3.1-70B AI model (medical-only scope)
+  - JWT authentication with role-based access (PATIENT/CLINICIAN/ADMIN)
+  - Appointment & Medication management
+  - Decision-tree Symptom Checker
+  - AES-256-GCM encryption for sensitive data
+  - Redis-based rate limiting
+  - Dark/Light mode
+================================================================================

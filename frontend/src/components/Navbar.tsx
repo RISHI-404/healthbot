@@ -11,11 +11,11 @@ export default function Navbar({ onToggleSidebar, onNewChat }: Props) {
     const { isDark, toggle } = useTheme();
 
     return (
-        <nav className="h-14 flex items-center justify-between px-4 border-b bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-xl border-[#ccfbf1] dark:border-[rgba(20,184,166,0.1)] flex-shrink-0">
+        <nav className="h-14 flex items-center justify-between px-4 border-b bg-white/90 dark:bg-[#0f172a]/80 backdrop-blur-xl border-[#e2e8f0] dark:border-[rgba(20,184,166,0.1)] flex-shrink-0 shadow-sm dark:shadow-none">
             {/* Left: sidebar toggle */}
             <button
                 onClick={onToggleSidebar}
-                className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa] dark:hover:bg-[#1a2332] transition-colors"
+                className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[#f8fafc] dark:hover:bg-[#1a2332] transition-colors"
             >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -36,7 +36,7 @@ export default function Navbar({ onToggleSidebar, onNewChat }: Props) {
                 <motion.button
                     whileTap={{ scale: 0.85 }}
                     onClick={toggle}
-                    className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[#f0fdfa] dark:hover:bg-[#1a2332] transition-colors"
+                    className="p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-[#f8fafc] dark:hover:bg-[#1a2332] transition-colors"
                     aria-label="Toggle dark mode"
                 >
                     <AnimatePresence mode="wait" initial={false}>

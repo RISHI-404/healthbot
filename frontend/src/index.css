@@ -11,7 +11,7 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   margin: 0;
-  background-color: #f0fdfa;
+  background-color: #f8fafc;
   color: #1e293b;
 }
 
@@ -40,12 +40,12 @@ html.dark body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #99f6e4;
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #5eead4;
+  background: #94a3b8;
 }
 
 html.dark ::-webkit-scrollbar-thumb {
@@ -85,8 +85,8 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   .btn-secondary {
     @apply px-5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200;
     color: #64748b;
-    background-color: #f0fdfa;
-    border: 1px solid #ccfbf1;
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
   }
 
   html.dark .btn-secondary {
@@ -108,21 +108,24 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   /* ─── Cards ──────────────────────────────────────── */
   .card {
     @apply rounded-2xl p-5;
-    background-color: #fff;
-    border: 1px solid #ccfbf1;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   }
 
   html.dark .card {
     background-color: #1a2332;
     border-color: rgba(20, 184, 166, 0.1);
+    box-shadow: none;
   }
 
   /* ─── Suggestion Cards ───────────────────────────── */
   .suggestion-card {
     @apply flex items-center gap-3 px-4 py-3.5 rounded-[14px] text-[14px] font-medium cursor-pointer transition-all duration-200 ease-in-out;
-    background-color: #f0fdfa;
-    border: 1px solid #ccfbf1;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
     color: #475569;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   }
 
   html.dark .suggestion-card {
@@ -150,8 +153,8 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   /* ─── Input Field ────────────────────────────────── */
   .input-field {
     @apply w-full px-4 py-3 rounded-xl text-sm focus:outline-none transition-all duration-200;
-    background-color: #fff;
-    border: 1px solid #ccfbf1;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
     color: #1e293b;
   }
 
@@ -177,15 +180,17 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   /* ─── Chat bubbles ───────────────────────────────── */
   .bubble-ai {
     @apply rounded-2xl rounded-bl-md px-4 py-3;
-    background-color: #f0fdfa;
+    background-color: #ffffff;
     color: #1e293b;
-    border: 1px solid #ccfbf1;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   }
 
   html.dark .bubble-ai {
     background-color: #1a2332;
     color: #e2e8f0;
     border-color: rgba(20, 184, 166, 0.1);
+    box-shadow: none;
   }
 
   .bubble-user {

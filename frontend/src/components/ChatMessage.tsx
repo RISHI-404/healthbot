@@ -12,8 +12,8 @@ function StaggeredMarkdown({ content }: { content: string }) {
     return (
         <>
             {paragraphs.map((p, i) => (
-                <motion.div key={i} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }}>
+                <motion.div key={i} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.18, delay: i * 0.02, ease: [0.16, 1, 0.3, 1] }}>
                     <ReactMarkdown>{p}</ReactMarkdown>
                 </motion.div>
             ))}
@@ -35,7 +35,7 @@ export default function ChatMessage({ message }: Props) {
             {/* Avatar */}
             <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isUser
                 ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white'
-                : 'bg-[#f0fdfa] dark:bg-[#1a2332] text-teal-500 ring-1 ring-[#ccfbf1] dark:ring-[rgba(20,184,166,0.2)]'
+                : 'bg-white dark:bg-[#1a2332] text-teal-500 ring-1 ring-[#e2e8f0] dark:ring-[rgba(20,184,166,0.2)]'
                 }`}>
                 {isUser ? 'U' : 'AI'}
             </div>
@@ -63,7 +63,7 @@ export default function ChatMessage({ message }: Props) {
 export function TypingIndicator() {
     return (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 mb-4">
-            <div className="relative w-8 h-8 rounded-full bg-[#f0fdfa] dark:bg-[#1a2332] flex items-center justify-center text-xs font-bold text-teal-500 ring-1 ring-[#ccfbf1] dark:ring-[rgba(20,184,166,0.2)] avatar-pulse">
+            <div className="relative w-8 h-8 rounded-full bg-white dark:bg-[#1a2332] flex items-center justify-center text-xs font-bold text-teal-500 ring-1 ring-[#e2e8f0] dark:ring-[rgba(20,184,166,0.2)] avatar-pulse">
                 AI
             </div>
             <div className="bubble-ai">
@@ -80,7 +80,7 @@ export function TypingIndicator() {
 export function StreamingMessage({ content }: { content: string }) {
     return (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 mb-4">
-            <div className="relative w-8 h-8 rounded-full bg-[#f0fdfa] dark:bg-[#1a2332] flex items-center justify-center text-xs font-bold text-teal-500 ring-1 ring-[#ccfbf1] dark:ring-[rgba(20,184,166,0.2)] avatar-pulse">
+            <div className="relative w-8 h-8 rounded-full bg-white dark:bg-[#1a2332] flex items-center justify-center text-xs font-bold text-teal-500 ring-1 ring-[#e2e8f0] dark:ring-[rgba(20,184,166,0.2)] avatar-pulse">
                 AI
             </div>
             <div className="max-w-[65%]">

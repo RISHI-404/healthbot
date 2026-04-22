@@ -15,6 +15,12 @@ from app.schemas.chat import (
 from app.services import chat_service
 from app.services.emergency_detector import detect_emergency, EMERGENCY_RESPONSE
 from app.services.nlp_pipeline import NLPPipeline
+from app.services.gemini_service import (
+    format_health_response,
+    parse_response_to_json,
+    validate_health_query,
+    NON_HEALTH_RESPONSE,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -39,6 +45,7 @@ NLP_MID_CONFIDENCE   = 0.50   # >= this  → use local AI model
                                # <  0.50  → fall back to NVIDIA API
 
 SESSION_COOKIE = "healthbot_session"
+
 
 
 def get_session_id(request: Request, response: Response) -> str:
@@ -98,19 +105,47 @@ async def send_message(
             },
         )
 
-    # Step 2: Get conversation context (shared by all AI tiers)
+    # Step 2: NLP pipeline — always run so we have intent + confidence
+    nlp = await _get_nlp_pipeline()
+    nlp_result = await nlp.process(msg.message, context=None)
+
+    confidence: float = nlp_result.get("confidence", 0.0)
+    nlp_intent: str = nlp_result.get("intent", "")
+
+    # Step 2.5: Healthcare-only filter — hybrid (NLP intent + keywords)
+    is_health, health_reason = validate_health_query(
+        msg.message, nlp_intent=nlp_intent, nlp_confidence=confidence,
+    )
+    if not is_health:
+        logger.info(f"[HealthFilter] Blocked non-health query ({health_reason}): {msg.message[:80]}")
+        structured = parse_response_to_json(NON_HEALTH_RESPONSE)
+        await chat_service.save_message(
+            db, conversation.id, "assistant", NON_HEALTH_RESPONSE,
+            intent="non_health_filtered",
+        )
+        await db.commit()
+        return StreamingResponse(
+            chat_service.stream_response(NON_HEALTH_RESPONSE, structured_data=structured),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Conversation-Id": str(conversation.id),
+                "X-Is-Emergency": "false",
+                "X-AI-Tier": "health_filter",
+                "Access-Control-Expose-Headers": "X-Conversation-Id, X-Is-Emergency, X-AI-Tier",
+            },
+        )
+
+    # Step 3: Get conversation context (shared by all AI tiers)
     context = await chat_service.get_conversation_context(db, conversation.id)
 
     # ------------------------------------------------------------------ #
-    # Step 3: HYBRID AI DECISION SYSTEM                                   #
+    # Step 4: HYBRID AI DECISION SYSTEM                                   #
     #   Tier 1 (confidence >= 0.80) → NLP ML response (fast, local)      #
     #   Tier 2 (confidence 0.50-0.79) → Local TinyLlama model            #
     #   Tier 3 (confidence < 0.50)  → NVIDIA API fallback                #
     # ------------------------------------------------------------------ #
-    nlp = await _get_nlp_pipeline()
-    nlp_result = await nlp.process(msg.message, context)
-
-    confidence: float = nlp_result.get("confidence", 0.0)
     ai_tier: str = ""
     response_text: str = ""
 
@@ -151,6 +186,12 @@ async def send_message(
                 "please call emergency services immediately."
             )
 
+    # Step 5: Format response into structured bullet points
+    response_text = format_health_response(response_text)
+
+    # Step 6: Parse into structured JSON for frontend
+    structured = parse_response_to_json(response_text)
+
     # Save assistant response (record which AI tier handled it)
     await chat_service.save_message(
         db, conversation.id, "assistant", response_text,
@@ -158,9 +199,9 @@ async def send_message(
     )
     await db.commit()
 
-    # Stream the response
+    # Stream the response with structured data
     return StreamingResponse(
-        chat_service.stream_response(response_text),
+        chat_service.stream_response(response_text, structured_data=structured),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
