@@ -50,19 +50,24 @@ def extract_entities(text: str) -> List[Dict[str, str]]:
     Extract named entities from text using spaCy + custom medical lexicon.
 
     Returns list of dicts with 'text', 'label', 'start', 'end'.
+    Falls back to keyword-only matching if spaCy is not installed.
     """
-    nlp = _get_nlp()
-    doc = nlp(text)
     entities = []
 
-    # spaCy NER entities
-    for ent in doc.ents:
-        entities.append({
-            "text": ent.text,
-            "label": ent.label_,
-            "start": ent.start_char,
-            "end": ent.end_char,
-        })
+    # spaCy NER (optional — gracefully skip if not installed)
+    try:
+        nlp = _get_nlp()
+        doc = nlp(text)
+        for ent in doc.ents:
+            entities.append({
+                "text": ent.text,
+                "label": ent.label_,
+                "start": ent.start_char,
+                "end": ent.end_char,
+            })
+    except Exception:
+        pass  # spaCy not available — use keyword matching only
+
 
     # Custom medical entity matching
     text_lower = text.lower()
