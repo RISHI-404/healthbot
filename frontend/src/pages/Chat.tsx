@@ -44,7 +44,8 @@ export default function Chat({ conversations, activeConvId, setActiveConvId, onC
         setMessages(prev => [...prev, userMsg]);
         setStreamingContent('');
 
-        await startStream('/api/chat/send', { message, conversation_id: activeConvId }, {
+        const apiBase = import.meta.env.VITE_API_URL || '';
+        await startStream(`${apiBase}/api/chat/send`, { message, conversation_id: activeConvId }, {
             onToken: (token) => setStreamingContent(prev => prev + token),
             onDone: () => {
                 setStreamingContent(prev => {

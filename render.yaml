@@ -1,11 +1,13 @@
 services:
-  # Backend Service
+  # Backend Service (FastAPI on Render)
   - type: web
     name: healthcare-chatbot-backend
     env: python
     plan: free
+    region: oregon
     buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
@@ -13,19 +15,20 @@ services:
         fromDatabase:
           name: healthcare-db
           property: connectionString
+      - key: SQLITE_FALLBACK
+        value: false
       - key: CORS_ORIGINS
-        value: "*"  # For simplicity in demo, or lock down to frontend URL later
+        value: "https://healthbot-nine.vercel.app,http://localhost:5173"
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: AES_ENCRYPTION_KEY
+        generateValue: true
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
       - key: NVIDIA_API_KEY
-        sync: false # User must enter this in dashboard
-
-  # Frontend Static Site
-  - type: web
-    name: healthcare-chatbot-frontend
-    env: node
-    plan: free
-    buildCommand: cd frontend && npm install && npm run build
-    startCommand: cd frontend && npm run preview -- --host 0.0.0.0 --port $PORT
-
+        sync: false  # Must enter in Render dashboard
 
 databases:
   - name: healthcare-db
