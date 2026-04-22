@@ -19,9 +19,15 @@ class NLPPipeline:
         """Load models and resources (runs CPU-bound work in thread pool)."""
         if self._initialized:
             return
-        # Run synchronous model loading in thread pool to avoid blocking event loop
-        await asyncio.to_thread(load_model)
-        await asyncio.to_thread(_get_nlp)  # Pre-load spaCy model
+        try:
+            # Run synchronous model loading in thread pool to avoid blocking event loop
+            await asyncio.to_thread(load_model)
+            await asyncio.to_thread(_get_nlp)  # Pre-load spaCy model
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"[NLP] Failed to load NLP models (will use API fallback): {e}"
+            )
         self._initialized = True
 
     async def process(self, text: str, context: List[Dict] = None) -> Dict[str, Any]:

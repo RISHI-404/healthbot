@@ -41,17 +41,25 @@ async def lifespan(app: FastAPI):
     # Initialize Local AI service (lazy model load on first request)
     from app.services.local_ai_service import local_ai_service
     if settings.LOCAL_AI_ENABLED:
-        import logging as _log
-        _log.getLogger(__name__).info(
-            f"Local AI enabled: {settings.LOCAL_AI_MODEL} "
-            f"(adapter: '{settings.LOCAL_AI_ADAPTER_PATH or 'none'}')"
-        )
-        local_ai_service.configure(
-            model_id=settings.LOCAL_AI_MODEL,
-            adapter_path=settings.LOCAL_AI_ADAPTER_PATH,
-            max_tokens=settings.LOCAL_AI_MAX_TOKENS,
-            use_quantize=settings.LOCAL_AI_QUANTIZE,
-        )
+        try:
+            import torch  # noqa: F401 — only available locally
+            import logging as _log
+            _log.getLogger(__name__).info(
+                f"Local AI enabled: {settings.LOCAL_AI_MODEL} "
+                f"(adapter: '{settings.LOCAL_AI_ADAPTER_PATH or 'none'}')"
+            )
+            local_ai_service.configure(
+                model_id=settings.LOCAL_AI_MODEL,
+                adapter_path=settings.LOCAL_AI_ADAPTER_PATH,
+                max_tokens=settings.LOCAL_AI_MAX_TOKENS,
+                use_quantize=settings.LOCAL_AI_QUANTIZE,
+            )
+        except ImportError:
+            import logging as _log
+            _log.getLogger(__name__).info(
+                "[LocalAI] torch/transformers not installed — Local AI disabled. "
+                "NVIDIA API will be used as fallback."
+            )
     app.state.local_ai_service = local_ai_service
 
     # Pre-warm NLP pipeline so the first chat request doesn't trigger
@@ -63,7 +71,7 @@ async def lifespan(app: FastAPI):
         await _get_nlp_pipeline()
         _nlp_log.getLogger(__name__).info("NLP pipeline ready.")
     except Exception as _nlp_exc:
-        _nlp_log.getLogger(__name__).warning(f"NLP pre-warm failed (non-fatal): {_nlp_exc}")
+        _nlp_log.getLogger(__name__).warning(f"NLP pre-warm skipped (non-fatal): {_nlp_exc}")
 
     yield
 
